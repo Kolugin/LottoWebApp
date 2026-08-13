@@ -1,0 +1,48 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam class {
+    BackgroundColor<<External>> #EFEFEF
+    BorderColor<<External>> #Gray
+    FontColor<<External>> #Gray
+}
+class AccessDeniedModel {
+  +OnGet()
+}
+class PageModel <<External>> {
+  (external)
+}
+PageModel <|-- AccessDeniedModel
+class LoginModel {
+  +string Login
+  +string Password
+  +string ErrorMessage
+  +OnPostAsync()
+}
+PageModel <|-- LoginModel
+class LoginAdminModel {
+  +string Login
+  +string Password
+  +string ErrorMessage
+  +OnPostAsync()
+}
+PageModel <|-- LoginAdminModel
+class RegisterModel {
+  +string Login
+  +string Email
+  +string Password
+  +string ConfirmPassword
+  +string? Phone
+  +OnPostAsync()
+}
+PageModel <|-- RegisterModel
+class RegisterAdminModel {
+  +string Login
+  +string Email
+  +string Password
+  +string ConfirmPassword
+  +string? Phone
+  +OnPostAsync()
+}
+PageModel <|-- RegisterAdminModel
+@enduml

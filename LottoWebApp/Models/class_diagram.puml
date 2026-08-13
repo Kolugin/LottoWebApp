@@ -1,0 +1,143 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam class {
+    BackgroundColor<<External>> #EFEFEF
+    BorderColor<<External>> #Gray
+    FontColor<<External>> #Gray
+}
+class Admin {
+  +int Id
+  +string Login
+  +string Password
+  +string Email
+  +string? Phone
+  +bool Activity
+  +DateTime? LastLogin
+  +AdminEncryptionKey? EncryptionKey
+}
+class AdminEncryptionKey {
+  +int Id
+  +int AdminId
+  +string EncryptionKey
+  +string IV
+  +Admin Admin
+}
+class DrawView {
+  +int Draw
+  +DateTime Date
+  +string Time
+  +List~int~ Numbers
+  +int Sum
+  +int SumUnpicked
+  +double Average
+  +double Median
+  +string HasRepeats
+  +double Variance
+  +double StdDeviation
+  +int Max
+  +int Min
+  +int EvenCount
+  +int OddCount
+  +int PrimeCount
+  +int CompositeCount
+  +int LowCount
+  +int HighCount
+  +int TriangularCount
+}
+class Lottery1224BY {
+  +int Draw
+  +string Date
+  +string Time
+  +int B1
+  +int B2
+  +int B3
+  +int B4
+  +int B5
+  +int B6
+  +int B7
+  +int B8
+  +int B9
+  +int B10
+  +int B11
+  +int B12
+}
+class Lottery536BY {
+  +int Draw
+  +string Date
+  +int B1
+  +int B2
+  +int B3
+  +int B4
+  +int B5
+  +int B6
+}
+class Lottery649BY {
+  +int Draw
+  +string Date
+  +int B1
+  +int B2
+  +int B3
+  +int B4
+  +int B5
+  +int B6
+}
+class LotteryBlitzBY {
+  +int Draw
+  +string Date
+  +string Time
+  +int B1
+  +int B2
+  +int B3
+  +int B4
+  +int B5
+  +int B6
+  +int B7
+  +int B8
+  +int BB
+}
+abstract class LotteryDraw {
+  +int Draw
+  +string Date
+  +List~int~ Numbers
+}
+class LotteryKenoBY {
+  +int Draw
+  +string Date
+  +int B1
+  +int B2
+  +int B3
+  +int B4
+  +int B5
+  +int B6
+  +int B7
+  +int B8
+  +int B9
+  +int B10
+  +int B11
+  +int B12
+  +int B13
+  +int B14
+  +int B15
+  +int B16
+  +int B17
+  +int B18
+}
+class User {
+  +int Id
+  +string Login
+  +string Password
+  +string Email
+  +string? Phone
+  +bool Activity
+  +DateTime? LastLogin
+  +UserEncryptionKey? EncryptionKey
+}
+class UserEncryptionKey {
+  +int Id
+  +int UserId
+  +string EncryptionKey
+  +string IV
+  +User User
+}
+@enduml

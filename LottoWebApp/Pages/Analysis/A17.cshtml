@@ -1,0 +1,214 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A17Model
+@{
+    ViewData["Title"] = "1.7 Вывод 10 частых и редких чисел по дню месяца";
+    bool is320 = Model.Game == "320";
+    var fields = is320 ? new[] { "B1", "B2" } : new[] { "B" };
+}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <form method="post" asp-page-handler="DownloadCsv" class="d-inline-block">
+        <input type="hidden" name="Game" value="@Model.Game" />
+        <input type="hidden" name="DrawCount" value="@Model.DrawCount" />
+        <input type="hidden" name="Direction" value="@Model.Direction" />
+        <input type="hidden" name="Title" value="@ViewData["Title"]" />
+        <input type="hidden" name="SelectedTable" id="selectedTableInput" value="" />
+        <button class="btn btn-success mb-4">💾 Скачать таблицу (CSV)</button>
+    </form>
+
+    <button class="btn btn-info mb-4 ms-2" onclick="downloadChart()">📥 Скачать график (PNG)</button>
+
+    <ul class="nav nav-tabs">
+        @foreach (var field in fields)
+        {
+            var fieldResults = is320 ? Model.ResultsByField[field] : Model.Results;
+            var daysWithData = Enumerable.Range(1, 31).Where(d => fieldResults.Any(r => r.DayOfMonth == d)).ToList();
+
+            <li class="nav-item">
+                <button class="nav-link @(field == fields[0] ? "active" : "")" data-bs-toggle="tab" data-bs-target="#tableTab_@field">📋 Таблица @(is320 ? field : "")</button>
+            </li>
+
+            @foreach (var day in daysWithData)
+            {
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab_@day@(is320 ? "_" + field : "")" data-day="@day" data-field="@field">День @day @(is320 ? "(" + field + ")" : "")</button>
+                </li>
+            }
+        }
+    </ul>
+
+    <div class="tab-content mt-3">
+        @foreach (var field in fields)
+        {
+            var fieldResults = is320 ? Model.ResultsByField[field] : Model.Results;
+            var daysWithData = Enumerable.Range(1, 31).Where(d => fieldResults.Any(r => r.DayOfMonth == d)).ToList();
+
+            <div class="tab-pane fade @(field == fields[0] ? "show active" : "")" id="tableTab_@field">
+                <table class="table table-dark table-bordered text-center">
+                    <thead>
+                        <tr>
+                            <th>День месяца</th>
+                            <th>№ Шара</th>
+                            <th>Кол-во выпадений</th>
+                            <th>Шанс (%)</th>
+                            <th>Тип</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in fieldResults)
+                        {
+                            <tr>
+                                <td>@r.DayOfMonth</td>
+                                <td>@r.Number</td>
+                                <td>@r.Count</td>
+                                <td>@r.Chance</td>
+                                <td>@r.Type</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @foreach (var day in daysWithData)
+            {
+                <div class="tab-pane fade" id="chartTab_@day@(is320 ? "_" + field : "")">
+                    <canvas id="chartDay_@day@(is320 ? "_" + field : "")" height="500"></canvas>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<script>
+    const is320 = @is320.ToString().ToLower();
+    const charts = {};
+    let activeCanvasId = null;
+
+    function decodeHtmlEntities(str) {
+        const txt = document.createElement("textarea");
+        txt.innerHTML = str;
+        return txt.value;
+    }
+
+    // Сериализуем данные через JSON
+    const groupedData = {
+        @foreach (var field in fields)
+        {
+            var fieldResults = is320 ? Model.ResultsByField[field] : Model.Results;
+            @:@Html.Raw(System.Text.Json.JsonSerializer.Serialize(field)): @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                fieldResults.GroupBy(r => r.DayOfMonth).ToDictionary(
+                    g => g.Key,
+                    g => new {
+                        numbers = g.Select(r => r.Number).ToList(),
+                        counts = g.Select(r => r.Count).ToList(),
+                        types = g.Select(r => r.Type).ToList()
+                    }
+                )
+            )),
+        }
+    };
+
+    function ensureChartForDay(field, day) {
+        const key = day + (is320 ? '_' + field : '');
+        if (charts[key]) return charts[key];
+
+        const dayData = groupedData[field] && groupedData[field][day];
+        if (!dayData) return null;
+
+        let combined = dayData.numbers.map((num, i) => ({
+            number: num,
+            count: dayData.counts[i],
+            type: decodeHtmlEntities(dayData.types[i]).trim()
+        }));
+
+        const frequent = combined.filter(x => x.type === "Частое").sort((a, b) => b.count - a.count);
+        const rare = combined.filter(x => x.type === "Редкое").sort((a, b) => a.count - b.count);
+        const sortedResults = [...frequent, ...rare];
+
+        const labels = sortedResults.map(x => `${x.number}`);
+        const values = sortedResults.map(x => x.count);
+        const colors = sortedResults.map(x => x.type === "Частое" ? "rgba(255,99,132,0.85)" : "rgba(54,162,235,0.8)");
+
+        const canvasId = 'chartDay_' + day + (is320 ? '_' + field : '');
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return null;
+
+        charts[key] = new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Количество выпадений (День ' + day + (is320 ? ' ' + field : '') + ')',
+                    data: values,
+                    backgroundColor: colors,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+
+        return charts[key];
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const activeTab = document.querySelector('.nav-tabs .nav-link.active');
+        if (activeTab) {
+            const target = activeTab.getAttribute('data-bs-target');
+            if (target && target.startsWith('#chartTab_')) {
+                const day = activeTab.dataset.day;
+                const field = activeTab.dataset.field;
+                if (day && field) {
+                    const key = day + (is320 ? '_' + field : '');
+                    ensureChartForDay(field, parseInt(day));
+                    activeCanvasId = 'chartDay_' + key;
+                }
+            }
+        }
+
+        document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(btn => {
+            btn.addEventListener('shown.bs.tab', function (e) {
+                const targetSelector = e.target.getAttribute('data-bs-target');
+                if (targetSelector && targetSelector.startsWith('#tableTab_')) {
+                    const field = targetSelector.substring(10);
+                    document.getElementById("selectedTableInput").value = is320 ? field : "";
+                } else if (targetSelector && targetSelector.startsWith('#chartTab_')) {
+                    const day = e.target.dataset.day;
+                    const field = e.target.dataset.field;
+                    if (day && field) {
+                        const key = day + (is320 ? '_' + field : '');
+                        ensureChartForDay(field, parseInt(day));
+                        activeCanvasId = 'chartDay_' + key;
+                    }
+                } else {
+                    activeCanvasId = null;
+                }
+            });
+        });
+    });
+
+    function downloadChart() {
+        if (!activeCanvasId) {
+            alert('График не инициализирован. Открой вкладку с графиком.');
+            return;
+        }
+        const key = activeCanvasId.replace('chartDay_', '');
+        const chart = charts[key];
+        if (!chart) return;
+        
+        const link = document.createElement("a");
+        link.href = chart.toBase64Image();
+        link.download = `Day_${key}_Analysis.png`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+    }
+</script>

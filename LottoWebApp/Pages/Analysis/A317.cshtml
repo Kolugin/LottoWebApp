@@ -1,0 +1,183 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A317Model
+@using System.Text.Json;
+@{
+    ViewData["Title"] = "3.17 Карта распределения простых и составных чисел";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <form method="post" class="mb-4">
+        <input type="hidden" name="Game" value="@Model.Game" />
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label for="DrawCount" class="form-label">Количество тиражей (0 - все)</label>
+                <input type="number" name="DrawCount" id="DrawCount" class="form-control" min="0" value="@(Model.DrawCount > 0 ? Model.DrawCount : 0)" />
+            </div>
+            <div class="col-md-4">
+                <label for="Direction" class="form-label">Направление</label>
+                <select name="Direction" id="Direction" class="form-select">
+                    <option value="newToOld" selected="@(Model.Direction == "newToOld")">Сначала новые</option>
+                    <option value="oldToNew" selected="@(Model.Direction == "oldToNew")">Сначала старые</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-primary w-100">Построить карту распределения</button>
+                @if (Model.PrimeCompositeResults.Any())
+                {
+                    <button type="submit" asp-page-handler="DownloadCsv" class="btn btn-success w-100 mt-2">💾 Скачать CSV</button>
+                }
+            </div>
+        </div>
+    </form>
+
+    @if (Model.PrimeCompositeResults.Any())
+    {
+        <ul class="nav nav-tabs">
+            <li class="nav-item">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tableTab">📋 Таблица</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab">📊 График</button>
+            </li>
+        </ul>
+
+        <div class="tab-content mt-3">
+            <div class="tab-pane fade show active" id="tableTab">
+                <div class="table-responsive">
+                    <table class="table table-dark table-bordered text-center">
+                        <thead>
+                            <tr>
+                                <th>Простые числа</th>
+                                <th>Составные числа</th>
+                                <th>Частота</th>
+                                <th>Шанс (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var result in Model.PrimeCompositeResults.OrderBy(r => r.PrimeCount).ThenBy(r => r.CompositeCount))
+                            {
+                                <tr>
+                                    <td>@result.PrimeCount</td>
+                                    <td>@result.CompositeCount</td>
+                                    <td>@result.Frequency</td>
+                                    <td>@result.Probability</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="chartTab">
+                <h4>График распределения частоты по простым и составным числам</h4>
+                <div style="height: 500px;">
+                    <canvas id="primeCompositeChart"></canvas>
+                </div>
+                <button class="btn btn-info mt-3" onclick="downloadChart('primeCompositeChart', 'A317_prime_composite_distribution.png')">📥 Скачать (PNG)</button>
+            </div>
+        </div>
+    }
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    const chartInstances = {};
+
+    @if (Model.PrimeCompositeResults.Any())
+    {
+            var jsonOptions = new JsonSerializerOptions
+            {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+
+            @:const rawData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                 Model.PrimeCompositeResults, jsonOptions
+                ));
+
+                // НОВАЯ СОРТИРОВКА: По возрастанию простых чисел, затем по возрастанию составных чисел.
+                @:const sortedData = [...rawData].sort((a, b) => {
+            @:    if (a.primeCount !== b.primeCount) {
+            @:        return a.primeCount - b.primeCount;
+            @:    }
+            @:    return a.compositeCount - b.compositeCount;
+            @:});
+
+            @:const labels = sortedData.map(r => `${r.primeCount}/${r.compositeCount}`);
+            @:const frequencies = sortedData.map(r => r.frequency);
+            @:const probabilities = sortedData.map(r => r.probability);
+
+            @:const primeCounts = sortedData.map(r => r.primeCount);
+            @:const compositeCounts = sortedData.map(r => r.compositeCount);
+
+
+            @:function createPrimeCompositeChart(canvasId) {
+            @:    const ctx = document.getElementById(canvasId)?.getContext('2d');
+            @:    if (!ctx || chartInstances[canvasId]) return;
+
+            @:    chartInstances[canvasId] = new Chart(ctx, {
+            @:        type: 'bar',
+            @:        data: {
+            @:            labels: labels,
+            @:            datasets: [{
+            @:                label: 'Частота',
+            @:                data: frequencies,
+            @:                backgroundColor: 'rgba(54, 162, 235, 0.8)',
+            @:                borderColor: 'rgba(54, 162, 235, 1)',
+            @:                borderWidth: 1
+            @:            }]
+            @:        },
+            @:        options: {
+            @:            responsive: true,
+            @:            maintainAspectRatio: false,
+            @:            scales: {
+            @:                y: { beginAtZero: true, title: { display: true, text: 'Частота' } },
+            @:                x: { title: { display: true, text: 'Простые/Составные' } }
+            @:            },
+            @:            plugins: {
+            @:                tooltip: {
+            @:                    callbacks: {
+            @:                        title: function(context) {
+            @:                            const index = context[0].dataIndex;
+            @:                            const prime = primeCounts[index] !== undefined ? primeCounts[index] : 'N/A';
+            @:                            const composite = compositeCounts[index] !== undefined ? compositeCounts[index] : 'N/A';
+            @:                            return `Простые: ${prime}, Составные: ${composite}`;
+            @:                        },
+            @:                        label: function(context) {
+            @:                            const index = context.dataIndex;
+            @:                            const prob = probabilities[index] !== undefined ? probabilities[index] : 'N/A';
+            @:                            return `Частота: ${context.raw}, Шанс: ${prob}%`;
+            @:                        }
+            @:                    }
+            @:                }
+            @:            }
+            @:        }
+            @:    });
+            @:}
+
+            @:document.addEventListener("DOMContentLoaded", function() {
+            @:    const chartTabButton = document.querySelector('[data-bs-target="#chartTab"]');
+            @:    if (chartTabButton) {
+            @:        chartTabButton.addEventListener('shown.bs.tab', function() {
+            @:            createPrimeCompositeChart('primeCompositeChart');
+            @:        });
+            @:    }
+            @:});
+
+            @:window.downloadChart = function(chartId, filename) {
+            @:    const chart = chartInstances[chartId];
+            @:    if (chart) {
+            @:        const link = document.createElement('a');
+            @:        link.href = chart.toBase64Image({ backgroundColor: 'white' });
+            @:        link.download = filename;
+            @:        link.click();
+            @:    } else {
+            @:        alert("График еще не создан. Пожалуйста, откройте вкладку 'График'.");
+            @:    }
+            @:};
+    }
+</script>

@@ -1,0 +1,69 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A34Model
+@{
+    ViewData["Title"] = "3.4 Карта разниц между всеми/соседними позициями";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <form method="post" class="mb-4">
+        <input type="hidden" name="Game" value="@Model.Game" />
+        <div class="row">
+            <div class="col-md-3">
+                <label for="DrawCount" class="form-label">Количество тиражей (0 - все)</label>
+                <input type="number" name="DrawCount" id="DrawCount" class="form-control" min="0" value="@(Model.DrawCount > 0 ? Model.DrawCount : 0)" />
+            </div>
+            <div class="col-md-3">
+                <label for="Direction" class="form-label">Направление</label>
+                <select name="Direction" id="Direction" class="form-select">
+                    <option value="newToOld" selected="@(Model.Direction == "newToOld")">Сначала новые</option>
+                    <option value="oldToNew" selected="@(Model.Direction == "oldToNew")">Сначала старые</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="DifferenceType" class="form-label">Тип разницы</label>
+                <select name="DifferenceType" id="DifferenceType" class="form-select">
+                    <option value="all" selected="@(Model.DifferenceType == "all")">Все позиции</option>
+                    <option value="sequential" selected="@(Model.DifferenceType == "sequential")">Соседние позиции</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100">Построить карту разниц</button>
+                @if (Model.ResultsTable != null)
+                {
+                    <button type="submit" asp-page-handler="DownloadCsv" class="btn btn-success w-100 mt-2">💾 Скачать CSV</button>
+                }
+            </div>
+        </div>
+    </form>
+
+    @if (Model.ResultsTable != null)
+    {
+        <div class="table-responsive">
+            <table class="table table-dark table-bordered text-center">
+                <thead>
+                    <tr>
+                        @for (int i = 0; i < Model.ResultsTable.Columns.Count; i++)
+                        {
+                            <th>@Model.ResultsTable.Columns[i].ColumnName</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < Model.ResultsTable.Rows.Count; i++)
+                    {
+                        <tr>
+                            @for (int j = 0; j < Model.ResultsTable.Columns.Count; j++)
+                            {
+                                <td>@Model.ResultsTable.Rows[i][j]</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

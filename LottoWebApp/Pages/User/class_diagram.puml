@@ -1,0 +1,48 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam class {
+    BackgroundColor<<External>> #EFEFEF
+    BorderColor<<External>> #Gray
+    FontColor<<External>> #Gray
+}
+class LogoutModel {
+  +OnGetAsync()
+}
+class PageModel <<External>> {
+  (external)
+}
+PageModel <|-- LogoutModel
+class UserMainMenuModel {
+  +string? UserName
+  +OnGet()
+  +OnGetEditProfile()
+  +OnGetLogoutAsync()
+}
+PageModel <|-- UserMainMenuModel
+class UserProfileModel {
+  +InputModel Input
+  +ChangePasswordInputModel ChangePasswordInput
+  +int Id
+  +string Login
+  +string Email
+  +string? Phone
+  +bool Activity
+  +DateTime? LastLogin
+  +OnGetAsync()
+  +OnPostUpdateProfileAsync()
+  +OnPostChangePasswordAsync()
+  +OnPostDeleteAccountAsync()
+}
+PageModel <|-- UserProfileModel
+class InputModel {
+  +string Login
+  +string Email
+  +string? Phone
+}
+class ChangePasswordInputModel {
+  +string OldPassword
+  +string NewPassword
+  +string ConfirmNewPassword
+}
+@enduml

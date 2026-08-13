@@ -1,0 +1,11 @@
+﻿@page
+@model LottoWebApp.Pages.Auth.AccessDeniedModel
+@{
+    ViewData["Title"] = "Доступ запрещен";
+}
+
+<div class="container mt-5 text-center">
+    <h1 class="display-4 text-danger">Доступ запрещён</h1>
+    <p class="lead">У вас нет прав для просмотра этой страницы.</p>
+    <a class="btn btn-primary mt-3" asp-page="/Auth/LoginAdmin">Вернуться к логину</a>
+</div>

@@ -1,0 +1,235 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A311Model
+@using System.Text.Json;
+@using System.Text.Json.Serialization;
+@{
+    ViewData["Title"] = "3.11 Карта распределения числовых комбинаций по колонкам";
+
+    // 1. Группируем данные по номеру колонки (ColNumber)
+    var groupedResults = Model.ColumnDistributionResults
+        .GroupBy(r => r.ColumnNumber)
+        .OrderBy(g => g.Key)
+        .ToList();
+
+    var chartData = groupedResults.ToDictionary(
+        g => g.Key.ToString(), // Ключ
+        g => g.Select(item => new
+        { // Значение (массив комбинаций)
+            Label = item.NumbersCombination,
+            Count = item.Count,
+            Chance = item.Chance
+        }).ToList()
+    );
+
+    // Опции сериализации 
+    var jsonOptions = new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <form method="post" class="mb-4">
+        <input type="hidden" name="Game" value="@Model.Game" />
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label for="DrawCount" class="form-label">Количество тиражей (0 - все)</label>
+                <input type="number" name="DrawCount" id="DrawCount" class="form-control" min="0" value="@(Model.DrawCount > 0 ? Model.DrawCount : 0)" />
+            </div>
+            <div class="col-md-4">
+                <label for="Direction" class="form-label">Направление</label>
+                <select name="Direction" id="Direction" class="form-select">
+                    <option value="newToOld" selected="@(Model.Direction == "newToOld")">Сначала новые</option>
+                    <option value="oldToNew" selected="@(Model.Direction == "oldToNew")">Сначала старые</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-primary w-100">Построить карту распределения</button>
+                @if (Model.ColumnDistributionResults.Any())
+                {
+                    <button type="submit" asp-page-handler="DownloadCsv" class="btn btn-success w-100 mt-2">💾 Скачать CSV</button>
+                }
+            </div>
+        </div>
+    </form>
+
+    @if (groupedResults.Any())
+    {
+        <ul class="nav nav-tabs">
+            <li class="nav-item">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tableTab">📋 Общая таблица</button>
+            </li>
+            @* Создаем вкладки по группам (номерам колонок) *@
+            @foreach (var group in groupedResults)
+            {
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab_@group.Key">
+                        📊 Колонка @group.Key
+                    </button>
+                </li>
+            }
+        </ul>
+
+        <div class="tab-content mt-3">
+            @* Вкладка 1: Общая таблица *@
+            <div class="tab-pane fade show active" id="tableTab">
+                <div class="table-responsive">
+                    <table class="table table-dark table-bordered text-center">
+                        <thead>
+                            <tr>
+                                <th>№ Колонки</th>
+                                <th>Числа комбинации</th>
+                                <th>Количество</th>
+                                <th>Шанс</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var result in Model.ColumnDistributionResults)
+                            {
+                                <tr>
+                                    <td>@result.ColumnNumber</td>
+                                    <td>@result.NumbersCombination</td>
+                                    <td>@result.Count</td>
+                                    <td>@result.Chance</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            @* Создаем панели для графиков по группам (номерам колонок) *@
+            @foreach (var group in groupedResults)
+            {
+                <div class="tab-pane fade" id="chartTab_@group.Key">
+                    <h3>График распределения для колонки @group.Key</h3>
+                    <p>Показывает количество выпадений каждой комбинации чисел (по строкам) в данной колонке.</p>
+                    <div style="height: 400px;">
+                        <canvas id="chartCol_@group.Key"></canvas>
+                    </div>
+
+                    <button class="btn btn-info mt-3"
+                            onclick="downloadChart('chartCol_@group.Key', 'A311_col@(group.Key)_distribution.png')">
+                        📥 Скачать (PNG)
+                    </button>
+
+                    @* Для удобства дублируем данные в мини-таблице *@
+                    <h5 class="mt-4">Данные колонки @group.Key</h5>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-bordered text-center">
+                            <thead>
+                                <tr>
+                                    <th>Комбинация</th>
+                                    <th>Количество</th>
+                                    <th>Шанс</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in group.OrderByDescending(i => i.Count))
+                                {
+                                    <tr>
+                                        <td>@item.NumbersCombination</td>
+                                        <td>@item.Count</td>
+                                        <td>@item.Chance</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    @if (groupedResults.Any())
+    {
+            // Передаем сгруппированные данные в JS
+            @:const allColumnData = @Html.Raw(JsonSerializer.Serialize(chartData, jsonOptions));
+
+            // Хранилище для созданных графиков, чтобы не перерисовывать
+            @:const chartInstances = {};
+
+            @:document.addEventListener('DOMContentLoaded', function() {
+            @:    // Находим все кнопки вкладок для графиков
+            @:    document.querySelectorAll('.nav-link[data-bs-target^="#chartTab_"]').forEach(tabButton => {
+            @:        tabButton.addEventListener('shown.bs.tab', function() {
+            @:            const columnNumber = this.getAttribute('data-bs-target').replace('#chartTab_', '');
+            @:            const canvasId = `chartCol_${columnNumber}`;
+            @:
+            @:            // Создаем график только один раз
+            @:            if (!chartInstances[canvasId]) {
+            @:                const ctx = document.getElementById(canvasId)?.getContext('2d');
+            @:                // Используем 'let', чтобы можно было изменить
+            @:                let dataForThisColumn = allColumnData[columnNumber];
+            @:
+            @:                if (ctx && dataForThisColumn) {
+            @:                    // --- ВАЖНОЕ ИЗМЕНЕНИЕ: Сортируем данные от MAX к MIN ---
+            @:                    dataForThisColumn.sort((a, b) => b.count - a.count);
+            @:
+            @:                    const labels = dataForThisColumn.map(r => r.label);
+            @:                    const values = dataForThisColumn.map(r => r.count);
+            @:                    const chances = dataForThisColumn.map(r => r.chance);
+            @:
+            @:                    chartInstances[canvasId] = new Chart(ctx, {
+            @:                        type: 'bar',
+            @:                        data: {
+            @:                            labels: labels,
+            @:                            datasets: [{
+            @:                                label: 'Количество выпадений',
+            @:                                data: values,
+            @:                                backgroundColor: 'rgba(54, 162, 235, 0.8)',
+            @:                                borderWidth: 1
+            @:                            }]
+            @:                        },
+            @:                        options: {
+            @:                            responsive: true,
+            @:                            maintainAspectRatio: false,
+            @:                            scales: { y: { beginAtZero: true } },
+            @:                            plugins: {
+            @:                                tooltip: {
+            @:                                    callbacks: {
+            @:                                        label: function(context) {
+            @:                                            const index = context.dataIndex;
+            @:                                            const count = context.parsed.y || 0;
+            @:                                            const chance = chances[index] || 0;
+            @:                                            return [
+            @:                                                `Кол-во: ${count}`,
+            @:                                                `Шанс: ${chance}%`
+            @:                                            ];
+            @:                                        }
+            @:                                    }
+            @:                                },
+            @:                                legend: {
+            @:                                    display: false
+            @:                                }
+            @:                            }
+            @:                        }
+            @:                    });
+            @:                }
+            @:            }
+            @:        });
+            @:    });
+            @:});
+
+            // Функция скачивания (нужна, чтобы быть доступной в HTML)
+            @:window.downloadChart = function(chartId, filename) {
+            @:    const chart = chartInstances[chartId];
+            @:    if (chart) {
+            @:        const link = document.createElement('a');
+            @:        link.href = chart.toBase64Image();
+            @:        link.download = filename;
+            @:        link.click();
+            @:    } else {
+            @:        console.error(`График с ID ${chartId} не найден.`);
+            @:        alert("График еще не был отрисован. Пожалуйста, подождите или попробуйте еще раз.");
+            @:    }
+            @:};
+    }
+</script>

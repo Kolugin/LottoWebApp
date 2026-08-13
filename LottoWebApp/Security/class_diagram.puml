@@ -1,0 +1,14 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam class {
+    BackgroundColor<<External>> #EFEFEF
+    BorderColor<<External>> #Gray
+    FontColor<<External>> #Gray
+}
+class CryptoHelper {
+  +GenerateKeyAndIV()
+  +Encrypt(string, string, string)
+  +Decrypt(string, string, string)
+}
+@enduml

@@ -1,0 +1,12 @@
+@startuml Component Diagram
+component "Data" as Data
+component "Models" as Models
+component "Pages" as Pages
+component "Security" as Security
+component "Services" as Services
+component "Admin" as Admin
+component "Analysis" as Analysis
+component "Auth" as Auth
+component "User" as User
+
+@enduml

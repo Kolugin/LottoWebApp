@@ -1,0 +1,244 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A21Model
+@{
+    ViewData["Title"] = "2.1 Общая частота 10 50 100";
+    bool is320 = Model.Game == "320";
+    var fields = is320 ? new[] { "B1", "B2" } : new[] { "B" };
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <form method="post" asp-page-handler="DownloadCsv" class="d-inline-block">
+        <input type="hidden" name="Game" value="@Model.Game" />
+        <input type="hidden" name="DrawCount" value="@Model.DrawCount" />
+        <input type="hidden" name="Direction" value="@Model.Direction" />
+        <input type="hidden" name="Title" value="@ViewData["Title"]" />
+        <input type="hidden" name="SelectedTable" id="selectedTableInput" value="" />
+        <button class="btn btn-success mb-4">💾 Скачать таблицу (CSV)</button>
+    </form>
+
+    <ul class="nav nav-tabs">
+        @foreach (var field in fields)
+        {
+            <li class="nav-item">
+                <button class="nav-link @(field == fields[0] ? "active" : "")" data-bs-toggle="tab" data-bs-target="#tableTab_@field">📋 Таблица @(is320? field : "")</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab10_@field" data-field="@field">📊 10 тиражей @(is320? field : "")</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab50_@field" data-field="@field">📊 50 тиражей @(is320? field : "")</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab100_@field" data-field="@field">📊 100 тиражей @(is320? field : "")</button>
+            </li>
+        }
+    </ul>
+
+    <div class="tab-content mt-3">
+        @foreach (var field in fields)
+        {
+            var fieldResults = is320 ? Model.ResultsByField[field] : Model.Results;
+
+            <div class="tab-pane fade @(field == fields[0] ? "show active" : "")" id="tableTab_@field">
+                <table class="table table-dark table-bordered text-center">
+                    <thead>
+                        <tr>
+                            <th>№ Шара</th>
+                            <th>Частота общая</th>
+                            <th>Частота на 10 последних тиражей</th>
+                            <th>Частота на 50 последних тиражей</th>
+                            <th>Частота на 100 последних тиражей</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in fieldResults)
+                        {
+                            <tr>
+                                <td>@r.Number</td>
+                                <td>@r.TotalFrequency</td>
+                                <td>@r.Last10Frequency</td>
+                                <td>@r.Last50Frequency</td>
+                                <td>@r.Last100Frequency</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="tab-pane fade" id="chartTab10_@field">
+                <canvas id="chart10_@field" height="120"></canvas>
+                <button class="btn btn-info mt-2" onclick="downloadChart('chart10_@field', 'A21_frequency_last10_@(field).png')">📥 Скачать (PNG)</button>
+            </div>
+
+            <div class="tab-pane fade" id="chartTab50_@field">
+                <canvas id="chart50_@field" height="120"></canvas>
+                <button class="btn btn-info mt-2" onclick="downloadChart('chart50_@field', 'A21_frequency_last50_@(field).png')">📥 Скачать (PNG)</button>
+            </div>
+
+            <div class="tab-pane fade" id="chartTab100_@field">
+                <canvas id="chart100_@field" height="120"></canvas>
+                <button class="btn btn-info mt-2" onclick="downloadChart('chart100_@field', 'A21_frequency_last100_@(field).png')">📥 Скачать (PNG)</button>
+            </div>
+        }
+    </div>
+</div>
+
+<script>
+    const is320 = @is320.ToString().ToLower();
+    const shouldColorByRanges = true;
+
+    function getCellColor(value, colIndex) {
+        value = parseFloat(value);
+        if (isNaN(value)) return "white";
+
+        let maxValue, yellowStart = 1.0, yellowEnd = 5.0;
+        const greenPoint = 1.0;
+
+        switch (colIndex) {
+            case 1:
+            case 4:
+                maxValue = 100.0;
+                yellowStart = 1.0;
+                yellowEnd = 20.0;
+                break;
+            case 2:
+                maxValue = 10.0;
+                yellowStart = 1.0;
+                yellowEnd = 5.0;
+                break;
+            case 3:
+                maxValue = 50.0;
+                yellowStart = 1.0;
+                yellowEnd = 15.0;
+                break;
+            default:
+                return "white";
+        }
+
+        if (value === 0 || value >= maxValue) {
+            return "rgb(255, 0, 0)";
+        }
+
+        let r, g;
+        const b = 0;
+
+        if (value <= greenPoint) {
+            const ratio = value / greenPoint;
+            r = Math.round(255 * (1 - ratio));
+            g = Math.round(255 * ratio);
+        }
+        else if (value <= yellowEnd) {
+            const ratio = (value - greenPoint) / (yellowEnd - greenPoint);
+            if (ratio <= 0.5) {
+                r = Math.round(255 * ratio * 2);
+                g = 255;
+            } else {
+                r = 255;
+                g = Math.round(255 - (ratio - 0.5) * 2 * 127);
+            }
+        }
+        else {
+            const ratio = (value - yellowEnd) / (maxValue - yellowEnd);
+            r = 255;
+            g = Math.round(128 * (1 - ratio));
+        }
+
+        return `rgb(${r},${g},${b})`;
+    }
+
+    if (shouldColorByRanges) {
+        document.querySelectorAll("#tableTab_B1 table tbody tr, #tableTab_B2 table tbody tr, #tableTab_B table tbody tr").forEach(row => {
+            const cells = row.querySelectorAll("td");
+            for (let i = 1; i < cells.length; i++) {
+                const cell = cells[i];
+                const val = cell.innerText.trim();
+                cell.style.backgroundColor = getCellColor(val, i);
+            }
+        });
+    }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+
+<script>
+    const chartData = {
+        @foreach (var field in fields)
+        {
+                var fieldResults = is320 ? Model.ResultsByField[field] : Model.Results;
+                @:@Html.Raw(System.Text.Json.JsonSerializer.Serialize(field)): {
+                    @:numbers: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(fieldResults.Select(r => r.Number))),
+                    @:last10Data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(fieldResults.Select(r => r.Last10Frequency))),
+                    @:last50Data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(fieldResults.Select(r => r.Last50Frequency))),
+                    @:last100Data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(fieldResults.Select(r => r.Last100Frequency)))
+                @:},
+        }
+    };
+
+    const barColor = 'rgba(54, 162, 235, 0.8)';
+    const charts = {};
+
+    function createChart(canvasId, label, dataArray, numbers) {
+        return new Chart(document.getElementById(canvasId), {
+            type: 'bar',
+            data: {
+                labels: numbers,
+                datasets: [{
+                    label: label,
+                    data: dataArray,
+                    backgroundColor: barColor,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true } },
+                plugins: {
+                    zoom: {
+                        zoom: {
+                            wheel: { enabled: true },
+                            pinch: { enabled: true },
+                            mode: 'x'
+                        },
+                        pan: {
+                            enabled: true,
+                            mode: 'x'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    @foreach (var field in fields)
+    {
+            <text>
+            charts['chart10_@field'] = createChart('chart10_@field', 'Частота на 10 последних тиражей (@field)', chartData['@field'].last10Data, chartData['@field'].numbers);
+            charts['chart50_@field'] = createChart('chart50_@field', 'Частота на 50 последних тиражей (@field)', chartData['@field'].last50Data, chartData['@field'].numbers);
+            charts['chart100_@field'] = createChart('chart100_@field', 'Частота на 100 последних тиражей (@field)', chartData['@field'].last100Data, chartData['@field'].numbers);
+            </text>
+    }
+
+    function downloadChart(chartId, filename) {
+        const chart = charts[chartId];
+        if (chart) {
+            const a = document.createElement('a');
+            a.href = chart.toBase64Image();
+            a.download = filename;
+            a.click();
+        }
+    }
+
+    document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(btn => {
+        btn.addEventListener('shown.bs.tab', function (e) {
+            const targetSelector = e.target.getAttribute('data-bs-target');
+            if (targetSelector && targetSelector.startsWith('#tableTab_')) {
+                const field = targetSelector.substring(10);
+                document.getElementById("selectedTableInput").value = is320 ? field : "";
+            }
+        });
+    });
+</script>

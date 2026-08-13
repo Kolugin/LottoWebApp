@@ -1,0 +1,151 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A23Model
+@{
+    ViewData["Title"] = "2.3 Карта пауз чисел";
+}
+
+<div class="container-fluid mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <!-- Кнопки экспорта -->
+    <form method="post" asp-page-handler="DownloadCsv" class="d-inline-block">
+        <input type="hidden" name="Game" value="@Model.Game" />
+        <input type="hidden" name="DrawCount" value="@Model.DrawCount" />
+        <input type="hidden" name="Direction" value="@Model.Direction" />
+        <input type="hidden" name="Title" value="@ViewData["Title"]" />
+        <button class="btn btn-success mb-4">💾 Скачать таблицу (CSV)</button>
+    </form>
+
+    @{
+        var maxBallNumber = 0;
+        if (Model.Results.Any())
+        {
+            maxBallNumber = Model.Results.Max(r => r.BallPauses.Keys.DefaultIfEmpty(0).Max());
+        }
+    }
+
+    <div class="table-responsive">
+        <table class="table table-bordered text-center" id="pauseMapTable">
+            <thead class="table-dark">
+                <tr>
+                    <th>Тираж</th>
+                    <th>Дата</th>
+                    @if (Model.HasTime)
+                    {
+                        <th>Время</th>
+                    }
+                    @for (int i = 1; i <= Model.TotalBalls; i++)
+                    {
+                        <th>№@i</th>
+                    }
+                    @if (Model.HasBonus)
+                    {
+                        for (int b = 1; b <= 4; b++)
+                        {
+                            <th>Бонус @b</th>
+                        }
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.Results)
+                {
+                    <tr>
+                        <td>@row.Draw</td>
+                        <td>@row.Date</td>
+                        @if (Model.HasTime)
+                        {
+                            <td>@row.Time</td>
+                        }
+                        @for (int i = 1; i <= Model.TotalBalls; i++)
+                        {
+                            var pause = row.BallPauses.TryGetValue(i, out int pauseValue) ? pauseValue : 0;
+                            <td class="pause-cell" data-value="@pause">@pause</td>
+                        }
+                        @if (Model.HasBonus)
+                        {
+                            for (int b = 1; b <= 4; b++)
+                            {
+                                var bonusPause = row.BonusPauses.TryGetValue(b, out int bonusPauseValue) ? bonusPauseValue : 0;
+                                <td class="bonus-pause-cell" data-value="@bonusPause">@bonusPause</td>
+                            }
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+    #pauseMapTable {
+        width: auto; /* пусть таблица сама подстраивается под данные */
+        min-width: 100%; /* но минимум занимать всю ширину контейнера */
+        font-size: 0.8rem;
+        border-collapse: collapse;
+    }
+
+        #pauseMapTable th,
+        #pauseMapTable td {
+            padding: 0.3rem 0.5rem;
+            text-align: center;
+            white-space: nowrap; /* не переносить текст внутри ячейки */
+        }
+
+    .table-responsive {
+        overflow-x: auto; /* горизонтальный скролл при переполнении */
+    }
+</style>
+
+
+
+<script>
+    // Функция для интерполяции цветов
+    function interpolateColor(color1, color2, factor) {
+        const r = Math.round(color1.r + factor * (color2.r - color1.r));
+        const g = Math.round(color1.g + factor * (color2.g - color1.g));
+        const b = Math.round(color1.b + factor * (color2.b - color1.b));
+        return { r, g, b };
+    }
+
+    // Функция для получения цвета ячейки на основе значения паузы
+    function getColorForPause(value) {
+        if (value <= 0) {
+            return 'white';
+        }
+
+        let color;
+
+        if (value <= 3) {
+            // От 1 до 3 пауз — от зелёного к жёлтому
+            const ratio = value / 3.0;
+            const green = { r: 0, g: 200, b: 0 };
+            const yellow = { r: 255, g: 255, b: 0 };
+            color = interpolateColor(green, yellow, ratio);
+        } else if (value <= 7) {
+            // От 4 до 7 — от жёлтого к красному
+            const ratio = (value - 3) / 4.0;
+            const yellow = { r: 255, g: 255, b: 0 };
+            const red = { r: 255, g: 0, b: 0 };
+            color = interpolateColor(yellow, red, ratio);
+        } else {
+            // 8 и выше — насыщенно-красный
+            color = { r: 255, g: 0, b: 0 };
+        }
+
+        return `rgb(${color.r}, ${color.g}, ${color.b})`;
+    }
+
+    // Применение цветов к таблице
+    document.addEventListener('DOMContentLoaded', function() {
+        const cells = document.querySelectorAll('.pause-cell, .bonus-pause-cell');
+        cells.forEach(cell => {
+            const value = parseInt(cell.getAttribute('data-value'));
+            if (!isNaN(value)) {
+                cell.style.backgroundColor = getColorForPause(value);
+            }
+        });
+    });
+</script>

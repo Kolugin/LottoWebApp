@@ -1,0 +1,247 @@
+# Class Diagram: Services
+
+```mermaid
+classDiagram
+    direction LR
+    classDef external fill:#f9f9f9,stroke:#333,stroke-dasharray: 5 5
+    class A110CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A111CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A112CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A113CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A114CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A115CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A116CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A117CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A118CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A11CsvExportHelper {
+        +ExportAsync(string?, int?, string?, bool, string?)
+    }
+    class A12CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A13CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class DrawStatistics {
+        +int Sum
+        +int SumUnpicked
+        +double Average
+        +double Median
+        +bool HasRepeatsFromPrevious
+        +double Variance
+        +double StdDeviation
+        +int Max
+        +int Min
+        +int EvenCount
+        +int OddCount
+        +int PrimeCount
+        +int CompositeCount
+        +int LowCount
+        +int HighCount
+        ...
+    }
+    class A14CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A15CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A16CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A17CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A18CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A19CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A21CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A22CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class FrequencyTracker {
+        +Add(double)
+        +GetMostFrequent()
+    }
+    class A23CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A310CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A311CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A312CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A313CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A314CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A315CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A316CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A317CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A318CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A319CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A31CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A320CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A321CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?, bool)
+    }
+    class A32CsvExportHelper {
+        +ExportAsync(string?, int?, string?, bool, string?)
+    }
+    class A33CsvExportHelper {
+        +ExportAsync(string?, int?, string?, int, bool, string?)
+    }
+    class A34CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?, string?)
+    }
+    class A35CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A36CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A37CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A38CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A39CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A41CsvExportHelper {
+        +ExportAsync(string, int, int?, string?)
+    }
+    class A42CsvExportHelper {
+        +ExportAsync(string, string, int?, string?)
+    }
+    class A51CsvExportHelper {
+        +ExportAsync(string, int?, string?, bool)
+    }
+    class A52CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?, int, int)
+    }
+    class A53CsvExportHelper {
+        +ExportAsync(string?, int?, string?, string?)
+    }
+    class A54CsvExportHelper {
+        +ExportAsync(string?, int?, string?, bool, string?)
+    }
+    class A61CsvExportHelper {
+        +ExportAsync(string?, int?, string?, int, string?, string?)
+    }
+    class A62CsvExportHelper {
+        +ExportAsync(string?, int?, string?, int, string?, string?)
+    }
+    class A63CsvExportHelper {
+        +ExportAsync(string?, int?, string?, int, int, string?)
+    }
+    class A64CsvExportHelper {
+        +ExportAsync(string?, int?, string?, int, int, int, string?)
+    }
+    class A65CsvExportHelper {
+        +ExportAsync(string?, int?, string?, List~A65Model.Cell~, string?)
+    }
+    class AppServices {
+        +LottoDbContext Db
+        +A11CsvExportHelper Csv11
+        +A12CsvExportHelper Csv12
+        +A13CsvExportHelper Csv13
+        +A14CsvExportHelper Csv14
+        +A15CsvExportHelper Csv15
+        +A16CsvExportHelper Csv16
+        +A17CsvExportHelper Csv17
+        +A18CsvExportHelper Csv18
+        +A19CsvExportHelper Csv19
+        +A110CsvExportHelper Csv110
+        +A111CsvExportHelper Csv111
+        +A112CsvExportHelper Csv112
+        +A113CsvExportHelper Csv113
+        +A114CsvExportHelper Csv114
+        ...
+    }
+    class BlitzDownloadService {
+    }
+    class BackgroundService:::external
+    BackgroundService <|-- BlitzDownloadService
+    class CsvExportService {
+        +ExportToCsvAsync(DataTable, string)
+    }
+    class KenoDownloadService {
+    }
+    class BackgroundService:::external
+    BackgroundService <|-- KenoDownloadService
+    class LotteryDataDownloader {
+        +DownloadBlitzResultsAsync()
+        +Download1224ResultsAsync()
+        +DownloadKenoResultsAsync()
+        +Download536ResultsAsync()
+        +Download649ResultsAsync()
+    }
+    class LotteryQueryProvider {
+        +GetQuery(string)
+    }
+    class ICacheService {
+        <<interface>>
+    }
+    class MemoryCacheService {
+        +GetOrCreateAsync(string, Func~Task~T~~, TimeSpan?)
+        +RemoveAsync(string)
+    }
+    class _1224DownloadService {
+    }
+    class BackgroundService:::external
+    BackgroundService <|-- _1224DownloadService
+    class _536DownloadService {
+    }
+    class BackgroundService:::external
+    BackgroundService <|-- _536DownloadService
+    class _649DownloadService {
+    }
+    class BackgroundService:::external
+    BackgroundService <|-- _649DownloadService
+
+```

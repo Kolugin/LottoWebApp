@@ -1,0 +1,274 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A54Model
+@{
+    ViewData["Title"] = "5.4 Таблица чисел по позициям";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <form method="post" class="mb-4">
+        <input type="hidden" name="Game" value="@Model.Game" />
+        <div class="row">
+            <div class="col-md-4">
+                <label for="DrawCount" class="form-label">Количество тиражей (0 - все)</label>
+                <input type="number" name="DrawCount" id="DrawCount" class="form-control" min="0" value="@(Model.DrawCount > 0 ? Model.DrawCount : 0)" />
+            </div>
+            <div class="col-md-4">
+                <label for="Direction" class="form-label">Направление</label>
+                <select name="Direction" id="Direction" class="form-select">
+                    <option value="newToOld" selected="@(Model.Direction == "newToOld")">Сначала новые</option>
+                    <option value="oldToNew" selected="@(Model.Direction == "oldToNew")">Сначала старые</option>
+                </select>
+            </div>
+            <div class="col-md-12 mt-2">
+                <button type="submit" class="btn btn-primary">Получить прогноз</button>
+                @if (Model.PredictedNumbersByPosition != null)
+                {
+                    <button type="submit" asp-page-handler="DownloadCsv" class="btn btn-success ms-2">💾 Скачать CSV</button>
+                }
+            </div>
+        </div>
+    </form>
+
+    @if (Model.PredictedNumbersByPosition != null)
+    {
+        <!-- Вкладки -->
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tableTab">📋 Таблица</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab">📊 Круговая диаграмма</button>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            <!-- Таблица -->
+            <div class="tab-pane fade show active" id="tableTab">
+                <div class="table-responsive">
+                    <table class="table table-dark table-bordered">
+                        <thead>
+                            <tr>
+                                @for (int pos = 0; pos < Model.NumberOfBalls; pos++)
+                                {
+                                    <th>№@(pos + 1)</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (int row = 0; row < Model.MaxRows; row++)
+                            {
+                                <tr>
+                                    @for (int pos = 0; pos < Model.NumberOfBalls; pos++)
+                                    {
+                                        if (Model.PredictedNumbersByPosition[pos].Count > row)
+                                        {
+                                            <td>@Model.PredictedNumbersByPosition[pos][row]</td>
+                                        }
+                                        else
+                                        {
+                                            <td></td>
+                                        }
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Круговая диаграмма -->
+            <div class="tab-pane fade" id="chartTab">
+                <div class="canvas-container" style="position: relative; height:1200px; width:1200px; margin: 0 auto;">
+                    <svg id="radialSvg" viewBox="-1.1 -1.1 2.2 2.2" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Основной круг -->
+                        <circle cx="0" cy="0" r="1" fill="none" stroke="#444" stroke-width="0.01" />
+                        <!-- Группы -->
+                        <g id="sectorLines"></g>
+                        <g id="sectorLabels"></g>
+                        <g id="dots"></g>
+                    </svg>
+                </div>
+                <div class="text-center mt-2">
+                    <button class="btn btn-info" onclick="downloadRadialChart()">📥 Скачать PNG</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<script>
+    @if (Model.PredictedNumbersByPosition != null)
+    {
+            @:const positionData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.PredictedNumbersByPosition));
+            @:const positionChances = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.PredictedChancesByPosition));
+    }
+
+        function renderRadialChart() {
+        const svg = document.getElementById('radialSvg');
+        if (!svg) return;
+
+        const gDots = document.getElementById('dots');
+        const gSectors = document.getElementById('sectorLines');
+        const gLabels = document.getElementById('sectorLabels');
+
+        // Очистка
+        gDots.innerHTML = '';
+        gSectors.innerHTML = '';
+        gLabels.innerHTML = '';
+
+        const positions = @Model.NumberOfBalls;
+        const angleStep = (2 * Math.PI) / positions;
+
+        // Рисуем линии секторов и подписи
+        for (let pos = 0; pos < positions; pos++) {
+            const angle = pos * angleStep;
+            const x2 = Math.cos(angle);
+            const y2 = Math.sin(angle);
+
+            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("x1", 0);
+            line.setAttribute("y1", 0);
+            line.setAttribute("x2", x2.toFixed(5));
+            line.setAttribute("y2", y2.toFixed(5));
+            line.setAttribute("stroke", "#555");
+            line.setAttribute("stroke-width", "0.005");
+            gSectors.appendChild(line);
+
+            // Подпись сектора
+            const labelR = 1.05;
+            const labelX = labelR * Math.cos(angle);
+            const labelY = labelR * Math.sin(angle);
+
+            const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            text.setAttribute("x", labelX.toFixed(5));
+            text.setAttribute("y", labelY.toFixed(5));
+            text.setAttribute("text-anchor", "middle");
+            text.setAttribute("dominant-baseline", "middle");
+            text.setAttribute("fill", "#fff");
+            text.setAttribute("font-size", "0.001");
+            text.textContent = pos + 1;
+            gLabels.appendChild(text);
+        }
+
+        // Инициализация единственной подсказки
+        let tooltip = document.getElementById("radialTooltip");
+        if (!tooltip) {
+            tooltip = document.createElement("div");
+            tooltip.id = "radialTooltip";
+            tooltip.style.position = "absolute";
+            tooltip.style.padding = "6px 10px";
+            tooltip.style.background = "rgba(0,0,0,0.85)";
+            tooltip.style.color = "#fff";
+            tooltip.style.fontSize = "13px";
+            tooltip.style.borderRadius = "6px";
+            tooltip.style.pointerEvents = "none";
+            tooltip.style.zIndex = "1000";
+            tooltip.style.display = "none";
+            document.body.appendChild(tooltip);
+        }
+
+        // Рисуем точки
+        for (let pos = 0; pos < positions; pos++) {
+            const nums = positionData[pos];
+            const chances = positionChances[pos];
+
+            const validChances = chances.filter(c => c > 0);
+            const minChance = validChances.length > 0 ? Math.min(...validChances) : 0;
+            const maxChance = validChances.length > 0 ? Math.max(...validChances) : 1;
+            const R_MIN = 0.15;
+            const R_MAX = 0.95;
+
+            const angle = pos * angleStep + angleStep / 2; // строго середина сектора
+
+            for (let i = 0; i < nums.length; i++) {
+                const number = nums[i];
+                const chance = chances[i];
+
+                // Нормализация шанса
+                let t = (maxChance > minChance) ? (chance - minChance) / (maxChance - minChance) : 1;
+                t = Math.max(0, Math.min(1, t));
+                const r = R_MIN + t * (R_MAX - R_MIN);
+
+                const x = r * Math.cos(angle);
+                const y = r * Math.sin(angle);
+
+                const hue = (pos * 360 / positions) % 360;
+                const color = `hsl(${hue}, 80%, 60%)`;
+
+                const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                circle.setAttribute("cx", x.toFixed(5));
+                circle.setAttribute("cy", y.toFixed(5));
+                circle.setAttribute("r", "0.015");
+                circle.setAttribute("fill", color);
+                circle.setAttribute("data-number", number);
+                circle.setAttribute("data-position", pos + 1);
+                circle.setAttribute("data-chance", chance);
+
+                // Обработчики подсказки
+                circle.addEventListener("mouseenter", function(e) {
+                    tooltip.style.display = "block";
+                    tooltip.innerHTML = `Число: <b>${number}</b><br>Позиция: ${pos + 1}<br>Шанс: ${(chance*100).toFixed(2)}%`;
+                });
+                circle.addEventListener("mouseleave", function() { tooltip.style.display = "none"; });
+                circle.addEventListener("mousemove", function(e) {
+                    tooltip.style.left = (e.pageX + 10) + "px";
+                    tooltip.style.top = (e.pageY - 10) + "px";
+                });
+
+                gDots.appendChild(circle);
+
+                // Текст числа точно в центре точки
+                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                text.setAttribute("x", x.toFixed(5));
+                text.setAttribute("y", y.toFixed(5));
+                text.setAttribute("text-anchor", "middle");
+                text.setAttribute("dominant-baseline", "middle");
+                text.setAttribute("fill", "#fff");
+                text.setAttribute("font-size", "0.01");
+                text.textContent = number;
+                gDots.appendChild(text);
+            }
+        }
+    }
+
+
+    function downloadRadialChart() {
+        const svg = document.getElementById('radialSvg');
+        const svgData = new XMLSerializer().serializeToString(svg);
+        const svgBlob = new Blob([svgData], { type: 'image/svg+xml' });
+        const svgUrl = URL.createObjectURL(svgBlob);
+
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const size = 1200; // размер изображения
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#0f1220';
+            ctx.fillRect(0, 0, size, size);
+            ctx.drawImage(img, 0, 0, size, size);
+
+            const pngUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = pngUrl;
+            link.download = 'A54_radial_chart.png';
+            link.click();
+
+            URL.revokeObjectURL(svgUrl);
+        };
+        img.src = svgUrl;
+    }
+
+    // Активация графика при переключении на вкладку
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelector('button[data-bs-target="#chartTab"]').addEventListener('shown.bs.tab', function () {
+            setTimeout(renderRadialChart, 100);
+        });
+    });
+</script>

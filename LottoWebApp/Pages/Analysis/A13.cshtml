@@ -1,0 +1,486 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A13Model
+@{
+    ViewData["Title"] = "1.3 Вывод общих характеристик";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <div class="mb-3">
+        <form id="csvForm" method="post" asp-page-handler="DownloadCsv">
+            <input type="hidden" name="Game" value="@Model.Game" />
+            <input type="hidden" name="DrawCount" value="@Model.DrawCount" />
+            <input type="hidden" name="Direction" value="@Model.Direction" />
+            <input type="hidden" name="Title" value="@ViewData["Title"]" />
+            <input type="hidden" name="SelectedTable" id="selectedTableInput" value="" />
+            <button type="submit" class="btn btn-success">💾 Скачать таблицу (CSV)</button>
+        </form>
+        <button class="btn btn-info" onclick="downloadChart()">📥 Скачать график (PNG)</button>
+    </div>
+
+    @if (Model.Game == "320")
+    {
+        <ul class="nav nav-tabs">
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tableTab1">📋 Таблица B1</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tableTab2">📋 Таблица B2</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTabSum1">📊 Суммы чисел (B1)</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTabSum2">📊 Суммы чисел (B2)</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTabAvgMed1">📈 Средние и медиана (B1)</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTabAvgMed2">📈 Средние и медиана (B2)</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTabVarStd1">📉 Дисперсия и СКО (B1)</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTabVarStd2">📉 Дисперсия и СКО (B2)</button></li>
+        </ul>
+
+        <div class="tab-content mt-3">
+
+            <!-- Таблица B1 -->
+            <div class="tab-pane fade show active" id="tableTab1">
+                <div class="table-responsive">
+                    <table class="table table-dark table-bordered text-center" id="statTable1">
+                        <thead>
+                            <tr>
+                                <th>Тираж</th>
+                                <th>Дата</th>
+                                <th>Время</th>
+                                <th>∑ чисел</th>
+                                <th>∑ не выпавших</th>
+                                <th>μ</th>
+                                <th>⌓ Медиана</th>
+                                <th>Повторения</th>
+                                <th>σ²</th>
+                                <th>σ</th>
+                                <th>↑Max</th>
+                                <th>↓Min</th>
+                                <th>Чет</th>
+                                <th>Нечет</th>
+                                <th>Простые</th>
+                                <th>Составные</th>
+                                <th>Низкие</th>
+                                <th>Высокие</th>
+                                <th>Треугольные</th>
+                                <th>Квадратные</th>
+                                <th>Зеркальные</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var d in Model.Stats1)
+                            {
+                                <tr>
+                                    <td>@d.Draw</td>
+                                    <td>@d.Date.ToString("dd.MM.yyyy")</td>
+                                    <td>@d.Time</td>
+                                    <td>@d.Sum1</td>
+                                    <td>@d.SumUnpicked1</td>
+                                    <td>@d.Average1</td>
+                                    <td>@d.Median1</td>
+                                    <td>@d.HasRepeats1</td>
+                                    <td>@d.Variance1</td>
+                                    <td>@d.StdDeviation1</td>
+                                    <td>@d.Max1</td>
+                                    <td>@d.Min1</td>
+                                    <td>@d.EvenCount1</td>
+                                    <td>@d.OddCount1</td>
+                                    <td>@d.PrimeCount1</td>
+                                    <td>@d.CompositeCount1</td>
+                                    <td>@d.LowCount1</td>
+                                    <td>@d.HighCount1</td>
+                                    <td>@d.TriangularCount1</td>
+                                    <td>@d.SquareCount1</td>
+                                    <td>@d.MirroredCount1</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Таблица B2 -->
+            <div class="tab-pane fade" id="tableTab2">
+                <div class="table-responsive">
+                    <table class="table table-dark table-bordered text-center" id="statTable2">
+                        <thead>
+                            <tr>
+                                <th>Тираж</th>
+                                <th>Дата</th>
+                                <th>Время</th>
+                                <th>∑ чисел</th>
+                                <th>∑ не выпавших</th>
+                                <th>μ</th>
+                                <th>⌓ Медиана</th>
+                                <th>Повторения</th>
+                                <th>σ²</th>
+                                <th>σ</th>
+                                <th>↑Max</th>
+                                <th>↓Min</th>
+                                <th>Чет</th>
+                                <th>Нечет</th>
+                                <th>Простые</th>
+                                <th>Составные</th>
+                                <th>Низкие</th>
+                                <th>Высокие</th>
+                                <th>Треугольные</th>
+                                <th>Квадратные</th>
+                                <th>Зеркальные</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var d in Model.Stats2)
+                            {
+                                <tr>
+                                    <td>@d.Draw</td>
+                                    <td>@d.Date.ToString("dd.MM.yyyy")</td>
+                                    <td>@d.Time</td>
+                                    <td>@d.Sum2</td>
+                                    <td>@d.SumUnpicked2</td>
+                                    <td>@d.Average2</td>
+                                    <td>@d.Median2</td>
+                                    <td>@d.HasRepeats2</td>
+                                    <td>@d.Variance2</td>
+                                    <td>@d.StdDeviation2</td>
+                                    <td>@d.Max2</td>
+                                    <td>@d.Min2</td>
+                                    <td>@d.EvenCount2</td>
+                                    <td>@d.OddCount2</td>
+                                    <td>@d.PrimeCount2</td>
+                                    <td>@d.CompositeCount2</td>
+                                    <td>@d.LowCount2</td>
+                                    <td>@d.HighCount2</td>
+                                    <td>@d.TriangularCount2</td>
+                                    <td>@d.SquareCount2</td>
+                                    <td>@d.MirroredCount2</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- График 1: Суммы чисел (B1) -->
+            <div class="tab-pane fade" id="chartTabSum1">
+                <canvas id="chartSum1" height="480"></canvas>
+            </div>
+
+            <!-- График 2: Суммы чисел (B2) -->
+            <div class="tab-pane fade" id="chartTabSum2">
+                <canvas id="chartSum2" height="480"></canvas>
+            </div>
+
+            <!-- График 3: Средние и медиана (B1) -->
+            <div class="tab-pane fade" id="chartTabAvgMed1">
+                <canvas id="chartAvgMed1" height="480"></canvas>
+            </div>
+
+            <!-- График 4: Средние и медиана (B2) -->
+            <div class="tab-pane fade" id="chartTabAvgMed2">
+                <canvas id="chartAvgMed2" height="480"></canvas>
+            </div>
+
+            <!-- График 5: Дисперсия и СКО (B1) -->
+            <div class="tab-pane fade" id="chartTabVarStd1">
+                <canvas id="chartVarStd1" height="480"></canvas>
+            </div>
+
+            <!-- График 6: Дисперсия и СКО (B2) -->
+            <div class="tab-pane fade" id="chartTabVarStd2">
+                <canvas id="chartVarStd2" height="480"></canvas>
+            </div>
+
+        </div>
+    }
+    else
+    {
+        <ul class="nav nav-tabs">
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tableTab">📋 Таблица</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab1">📊 Суммы чисел</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab2">📈 Средние и медиана</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab3">📉 Дисперсия и СКО</button></li>
+        </ul>
+
+        <div class="tab-content mt-3">
+
+            <!-- Таблица -->
+            <div class="tab-pane fade show active" id="tableTab">
+                <div class="table-responsive">
+                    <table class="table table-dark table-bordered text-center" id="statTable">
+                        <thead>
+                            <tr>
+                                <th>Тираж</th>
+                                <th>Дата</th>
+                                @if (!(Model.Game == "keno" || Model.Game == "5x36" || Model.Game == "6x49"))
+                                {
+                                    <th>Время</th>
+                                }
+                                <th>∑ чисел выпавших</th>
+                                <th>∑ чисел не выпавших</th>
+                                <th>μ число</th>
+                                <th>⌓ Медиана</th>
+                                <th>Повторения чисел</th>
+                                <th>σ² Дисперсия</th>
+                                <th>σ СКО</th>
+                                <th>↑ Макс число</th>
+                                <th>↓ Мин число</th>
+                                <th>Четных</th>
+                                <th>Нечетных</th>
+                                <th>Кол-во простых</th>
+                                <th>Кол-во составных</th>
+                                <th>Кол-во низких</th>
+                                <th>Кол-во высоких</th>
+                                <th>Кол-во треугольных</th>
+                                <th>Кол-во квадратных</th>
+                                <th>Кол-во зеркальных</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var d in Model.Stats)
+                            {
+                                <tr>
+                                    <td>@d.Draw</td>
+                                    <td>@d.Date.ToString("dd.MM.yyyy")</td>
+                                    @if (!(Model.Game == "keno" || Model.Game == "5x36" || Model.Game == "6x49"))
+                                    {
+                                        <td>@d.Time</td>
+                                    }
+                                    <td>@d.Sum</td>
+                                    <td>@d.SumUnpicked</td>
+                                    <td>@d.Average</td>
+                                    <td>@d.Median</td>
+                                    <td>@d.HasRepeats</td>
+                                    <td>@d.Variance</td>
+                                    <td>@d.StdDeviation</td>
+                                    <td>@d.Max</td>
+                                    <td>@d.Min</td>
+                                    <td>@d.EvenCount</td>
+                                    <td>@d.OddCount</td>
+                                    <td>@d.PrimeCount</td>
+                                    <td>@d.CompositeCount</td>
+                                    <td>@d.LowCount</td>
+                                    <td>@d.HighCount</td>
+                                    <td>@d.TriangularCount</td>
+                                    <td>@d.SquareCount</td>
+                                    <td>@d.MirroredCount</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- График 1: Суммы чисел -->
+            <div class="tab-pane fade" id="chartTab1">
+                <canvas id="chartSum" height="480"></canvas>
+            </div>
+
+            <!-- График 2: Среднее и медиана -->
+            <div class="tab-pane fade" id="chartTab2">
+                <canvas id="chartAvgMedian" height="480"></canvas>
+            </div>
+
+            <!-- График 3: Дисперсия и СКО -->
+            <div class="tab-pane fade" id="chartTab3">
+                <canvas id="chartVarianceStd" height="480"></canvas>
+            </div>
+
+        </div>
+    }
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+
+<script>
+    const is320 = "@Model.Game" === "320";
+    let draws = [];
+    let sums1 = [], sums2 = [];
+    let averages1 = [], averages2 = [];
+    let medians1 = [], medians2 = [];
+    let variances1 = [], variances2 = [];
+    let stds1 = [], stds2 = [];
+
+        if (is320) {
+        draws = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats1.Select(s => s.Draw)));
+        sums1 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats1.Select(s => s.Sum1)));
+        sumsUnpicked1 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats1.Select(s => s.SumUnpicked1)));
+        sums2 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats2.Select(s => s.Sum2)));
+        sumsUnpicked2 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats2.Select(s => s.SumUnpicked2)));
+        averages1 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats1.Select(s => s.Average1)));
+        averages2 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats2.Select(s => s.Average2)));
+        medians1 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats1.Select(s => s.Median1)));
+        medians2 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats2.Select(s => s.Median2)));
+        variances1 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats1.Select(s => s.Variance1)));
+        variances2 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats2.Select(s => s.Variance2)));
+        stds1 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats1.Select(s => s.StdDeviation1)));
+        stds2 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats2.Select(s => s.StdDeviation2)));
+    } else {
+        draws = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats.Select(s => s.Draw)));
+        sums = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats.Select(s => s.Sum)));
+        sumsUnpicked = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats.Select(s => s.SumUnpicked)));
+        averages = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats.Select(s => s.Average)));
+        medians = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats.Select(s => s.Median)));
+        variances = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats.Select(s => s.Variance)));
+        stds = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats.Select(s => s.StdDeviation)));
+    }
+
+    // Общие настройки масштабирования
+    const zoomOptions = {
+        zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' },
+        pan: { enabled: true, mode: 'xy' }
+    };
+
+    // Универсальная функция построения графиков
+    function createChart(canvasId, type, datasets) {
+        return new Chart(document.getElementById(canvasId).getContext('2d'), {
+            type: type,
+            data: { labels: draws, datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: false }, x: { display: true } },
+                plugins: { zoom: zoomOptions }
+            }
+        });
+    }
+
+    // Хранилище графиков
+    const charts = {};
+
+        function ensureChartSum1() {
+        if (!charts.chartSum1) {
+            charts.chartSum1 = createChart("chartSum1", "bar", [
+                { label: "∑ чисел (B1)", data: sums1, backgroundColor: "rgba(0,123,255,0.7)" },
+                { label: "∑ не выпавших (B1)", data: sumsUnpicked1, backgroundColor: "rgba(220,53,69,0.7)" }
+            ]);
+        }
+        return charts.chartSum1;
+    }
+
+    function ensureChartSum2() {
+        if (!charts.chartSum2) {
+            charts.chartSum2 = createChart("chartSum2", "bar", [
+                { label: "∑ чисел (B2)", data: sums2, backgroundColor: "rgba(0,123,255,0.7)" },
+                { label: "∑ не выпавших (B2)", data: sumsUnpicked2, backgroundColor: "rgba(220,53,69,0.7)" }
+            ]);
+        }
+        return charts.chartSum2;
+    }
+
+    function ensureChartAvgMed1() {
+        if (!charts.chartAvgMed1) {
+            charts.chartAvgMed1 = createChart("chartAvgMed1", "line", [
+                { label: "Среднее (B1)", data: averages1, borderColor: "rgba(0,123,255,0.9)", fill: false },
+                { label: "Медиана (B1)", data: medians1, borderColor: "rgba(220,53,69,0.9)", fill: false }
+            ]);
+        }
+        return charts.chartAvgMed1;
+    }
+
+    function ensureChartAvgMed2() {
+        if (!charts.chartAvgMed2) {
+            charts.chartAvgMed2 = createChart("chartAvgMed2", "line", [
+                { label: "Среднее (B2)", data: averages2, borderColor: "rgba(0,123,255,0.9)", fill: false },
+                { label: "Медиана (B2)", data: medians2, borderColor: "rgba(220,53,69,0.9)", fill: false }
+            ]);
+        }
+        return charts.chartAvgMed2;
+    }
+
+    function ensureChartVarStd1() {
+        if (!charts.chartVarStd1) {
+            charts.chartVarStd1 = createChart("chartVarStd1", "line", [
+                { label: "Дисперсия (B1)", data: variances1, borderColor: "rgba(40,167,69,0.9)", fill: true, backgroundColor: "rgba(40,167,69,0.2)" },
+                { label: "СКО (B1)", data: stds1, borderColor: "rgba(255,193,7,0.9)", fill: true, backgroundColor: "rgba(255,193,7,0.2)" }
+            ]);
+        }
+        return charts.chartVarStd1;
+    }
+
+    function ensureChartVarStd2() {
+        if (!charts.chartVarStd2) {
+            charts.chartVarStd2 = createChart("chartVarStd2", "line", [
+                { label: "Дисперсия (B2)", data: variances2, borderColor: "rgba(40,167,69,0.9)", fill: true, backgroundColor: "rgba(40,167,69,0.2)" },
+                { label: "СКО (B2)", data: stds2, borderColor: "rgba(255,193,7,0.9)", fill: true, backgroundColor: "rgba(255,193,7,0.2)" }
+            ]);
+        }
+        return charts.chartVarStd2;
+    }
+
+    let activeCanvasId = null;
+
+    document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(btn => {
+            btn.addEventListener("shown.bs.tab", e => {
+                const target = e.target.getAttribute("data-bs-target");
+
+                if (target === "#chartTabSum1") { ensureChartSum1(); activeCanvasId = "chartSum1"; }
+                if (target === "#chartTabSum2") { ensureChartSum2(); activeCanvasId = "chartSum2"; }
+                if (target === "#chartTabAvgMed1") { ensureChartAvgMed1(); activeCanvasId = "chartAvgMed1"; }
+                if (target === "#chartTabAvgMed2") { ensureChartAvgMed2(); activeCanvasId = "chartAvgMed2"; }
+                if (target === "#chartTabVarStd1") { ensureChartVarStd1(); activeCanvasId = "chartVarStd1"; }
+                if (target === "#chartTabVarStd2") { ensureChartVarStd2(); activeCanvasId = "chartVarStd2"; }
+
+                // Для остальных вкладок
+                if (target === "#chartTab1") { ensureChartSum(); activeCanvasId = "chartSum"; }
+                if (target === "#chartTab2") { ensureChartAvgMedian(); activeCanvasId = "chartAvgMedian"; }
+                if (target === "#chartTab3") { ensureChartVarianceStd(); activeCanvasId = "chartVarianceStd"; }
+            });
+        });
+    });
+
+    function ensureChartSum() {
+        if (!charts.chartSum) {
+            charts.chartSum = createChart("chartSum", "bar", [
+                { label: "∑ выпавших", data: sums, backgroundColor: "rgba(0,123,255,0.7)" },
+                { label: "∑ не выпавших", data: sumsUnpicked, backgroundColor: "rgba(220,53,69,0.7)" }
+            ]);
+        }
+        return charts.chartSum;
+    }
+
+    function ensureChartAvgMedian() {
+        if (!charts.chartAvgMedian) {
+            charts.chartAvgMedian = createChart("chartAvgMedian", "line", [
+                { label: "Среднее", data: averages, borderColor: "rgba(0,123,255,0.9)", fill: false },
+                { label: "Медиана", data: medians, borderColor: "rgba(220,53,69,0.9)", fill: false }
+            ]);
+        }
+        return charts.chartAvgMedian;
+    }
+
+    function ensureChartVarianceStd() {
+        if (!charts.chartVarianceStd) {
+            charts.chartVarianceStd = createChart("chartVarianceStd", "line", [
+                { label: "Дисперсия", data: variances, borderColor: "rgba(40,167,69,0.9)", fill: true, backgroundColor: "rgba(40,167,69,0.2)" },
+                { label: "СКО", data: stds, borderColor: "rgba(255,193,7,0.9)", fill: true, backgroundColor: "rgba(255,193,7,0.2)" }
+            ]);
+        }
+        return charts.chartVarianceStd;
+    }
+
+    function downloadChart() {
+        if (!activeCanvasId || !charts[activeCanvasId]) return alert("Сначала открой вкладку с графиком.");
+        const link = document.createElement("a");
+        link.href = charts[activeCanvasId].toBase64Image();
+        link.download = activeCanvasId + ".png";
+        link.click();
+    }
+        document.addEventListener("DOMContentLoaded", () => {
+        // Обновляем значение SelectedTable при переключении вкладок
+        document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(btn => {
+            btn.addEventListener("shown.bs.tab", e => {
+                const target = e.target.getAttribute("data-bs-target");
+                if (target === "#tableTab1") {
+                    document.getElementById("selectedTableInput").value = "B1";
+                } else if (target === "#tableTab2") {
+                    document.getElementById("selectedTableInput").value = "B2";
+                }
+            });
+        });
+
+        // Для остальных игр оставляем пустым или "default"
+        if (!is320) {
+            document.getElementById("selectedTableInput").value = "";
+        }
+    });
+</script>

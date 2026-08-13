@@ -1,0 +1,197 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A11Model
+@{
+    ViewData["Title"] = "1.1 Вывод всех тиражей как есть";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <div class="mb-3">
+        <form method="post" asp-page-handler="DownloadCsv">
+            <input type="hidden" name="Game" value="@Model.Game" />
+            <input type="hidden" name="DrawCount" value="@Model.DrawCount" />
+            <input type="hidden" name="Direction" value="@Model.Direction" />
+            <input type="hidden" name="Title" value="@ViewData["Title"]" />
+            <button type="submit" class="btn btn-success">💾 Скачать таблицу (CSV)</button>
+        </form>
+
+        <button class="btn btn-info" onclick="downloadChart()">📥 Скачать график (PNG)</button>
+    </div>
+
+    @if (Model.Game == "320")
+    {
+        <ul class="nav nav-tabs">
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tableTab">📋 Таблица</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab1">📊 График 1 (B1)</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab2">📊 График 2 (B2)</button></li>
+        </ul>
+
+        <div class="tab-content mt-3">
+            <!-- Таблица -->
+            <div class="tab-pane fade show active" id="tableTab">
+                <div class="table-responsive">
+                    <table class="table table-dark table-bordered text-center" id="drawsTable">
+                        <thead>
+                            <tr>
+                                <th>Тираж</th>
+                                <th>Дата</th>
+                                <th>Время</th>
+                                <th>B11</th>
+                                <th>B12</th>
+                                <th>B13</th>
+                                <th>B21</th>
+                                <th>B22</th>
+                                <th>B23</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var d in Model.Draws)
+                            {
+                                <tr>
+                                    <td>@d.Draw</td>
+                                    <td>@d.Date.ToString("dd.MM.yyyy")</td>
+                                    <td>@d.Time</td>
+                                    @for (int i = 0; i < 3; i++)
+                                    {
+                                        <td>@(d.Numbers1[i] == 0 ? "-" : d.Numbers1[i].ToString())</td>
+                                    }
+                                    @for (int i = 0; i < 3; i++)
+                                    {
+                                        <td>@(d.Numbers2[i] == 0 ? "-" : d.Numbers2[i].ToString())</td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- График 1 -->
+            <div class="tab-pane fade" id="chartTab1">
+                <canvas id="chartNumbers1" height="120"></canvas>
+            </div>
+
+            <!-- График 2 -->
+            <div class="tab-pane fade" id="chartTab2">
+                <canvas id="chartNumbers2" height="120"></canvas>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Стандартный вывод -->
+        <ul class="nav nav-tabs">
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tableTab">📋 Таблица</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab">📊 График</button></li>
+        </ul>
+
+        <div class="tab-content mt-3">
+            <div class="tab-pane fade show active" id="tableTab">
+                <div class="table-responsive">
+                    <table class="table table-dark table-bordered text-center" id="drawsTable">
+                        <thead>
+                            <tr>
+                                @foreach (var h in Model.Headers)
+                                {
+                                    if (h == "Время" && (Model.Game == "keno" || Model.Game == "5x36" || Model.Game == "6x49")) continue;
+                                    <th>@h</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var d in Model.Draws)
+                            {
+                                <tr>
+                                    <td>@d.Draw</td>
+                                    <td>@d.Date.ToString("dd.MM.yyyy")</td>
+                                    @if (!(Model.Game == "keno" || Model.Game == "5x36" || Model.Game == "6x49"))
+                                    {
+                                        <td>@d.Time</td>
+                                    }
+                                    @foreach (var num in d.Numbers)
+                                    {
+                                        <td>@(num == 0 ? "-" : num.ToString())</td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="chartTab">
+                <canvas id="chartNumbers" height="120"></canvas>
+            </div>
+        </div>
+    }
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const is3x3 = "@Model.Game" === "320";
+    let chartRef1 = null;
+    let chartRef2 = null;
+    let chartRefSingle = null;
+
+    if (is3x3) {
+        const labels1 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ChartLabels1));
+        const values1 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ChartValues1));
+        const labels2 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ChartLabels2));
+        const values2 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ChartValues2));
+
+        if (labels1.length > 0) {
+            chartRef1 = new Chart(document.getElementById('chartNumbers1'), {
+                type: 'bar',
+                data: { labels: labels1, datasets: [{ label: 'Частота (B1)', data: values1, backgroundColor: 'rgba(54,162,235,0.7)', borderWidth: 1 }] },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        if (labels2.length > 0) {
+            chartRef2 = new Chart(document.getElementById('chartNumbers2'), {
+                type: 'bar',
+                data: { labels: labels2, datasets: [{ label: 'Частота (B2)', data: values2, backgroundColor: 'rgba(255,99,132,0.7)', borderWidth: 1 }] },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+        }
+    } else {
+        const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ChartLabels));
+        const values = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ChartValues));
+
+        if (labels.length > 0) {
+            chartRefSingle = new Chart(document.getElementById('chartNumbers'), {
+                type: 'bar',
+                data: { labels: labels, datasets: [{ label: 'Количество выпадений', data: values, backgroundColor: labels.map(l => l.includes("Бонус") ? 'rgba(255,99,132,0.7)' : 'rgba(54,162,235,0.7)'), borderWidth: 1 }] },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+        }
+    }
+
+    function downloadChart() {
+        if (is3x3) {
+            if (chartRef1) {
+                const a = document.createElement("a");
+                a.href = chartRef1.toBase64Image();
+                a.download = "chart_b1.png";
+                a.click();
+            }
+            if (chartRef2) {
+                setTimeout(() => {
+                    const a = document.createElement("a");
+                    a.href = chartRef2.toBase64Image();
+                    a.download = "chart_b2.png";
+                    a.click();
+                }, 300);
+            }
+        } else {
+            if (!chartRefSingle) return;
+            const a = document.createElement("a");
+            a.href = chartRefSingle.toBase64Image();
+            a.download = "chart.png";
+            a.click();
+        }
+    }
+</script>

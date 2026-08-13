@@ -1,0 +1,187 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A113Model
+@{
+    ViewData["Title"] = "1.13 Вывод частоты и шанса выпадения дополнительного шара по дням недели";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <!-- Кнопки экспорта -->
+    <!-- Замените старую форму на следующую -->
+
+    <form id="csvForm" method="post" asp-page-handler="DownloadCsv">
+        <input type="hidden" name="Game" value="@Model.Game" />
+        <input type="hidden" name="DrawCount" value="@Model.DrawCount" />
+        <input type="hidden" name="Direction" value="@Model.Direction" />
+        <input type="hidden" name="Title" value="@ViewData["Title"]" />
+        <input type="hidden" name="SelectedTable" id="selectedTableInput" value="" />
+        <button type="submit" class="btn btn-success">💾 Скачать таблицу (CSV)</button>
+    </form>
+
+    <button class="btn btn-info mb-4 ms-2" onclick="downloadChart()">📥 Скачать график (PNG)</button>
+
+    <ul class="nav nav-tabs">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tableTab">📋 Таблица</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab">📊 График</button></li>
+        @{
+            var daysOfWeekOrder = new[] { "понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье" };
+        }
+        @foreach (var dayOfWeek in daysOfWeekOrder)
+        {
+            if (Model.Results.Any(r => r.DayOfWeek == dayOfWeek))
+            {
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab@(dayOfWeek.Replace(" ", "-"))">@dayOfWeek</button>
+                </li>
+            }
+        }
+    </ul>
+
+    <div class="tab-content mt-3">
+
+        <!-- Таблица -->
+        <div class="tab-pane fade show active" id="tableTab">
+            <table class="table table-dark table-bordered text-center">
+                <thead>
+                    <tr>
+                        <th>День недели</th>
+                        <th>№ Шара</th>
+                        <th>Кол-во выпадений</th>
+                        <th>Шанс (%)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in Model.Results)
+                    {
+                        <tr>
+                            <td>@r.DayOfWeek</td>
+                            <td>@r.Number</td>
+                            <td>@r.Count</td>
+                            <td>@r.Chance</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Общий график -->
+        <div class="tab-pane fade" id="chartTab">
+            <canvas id="chartFreq" height="120"></canvas>
+        </div>
+
+        <!-- Графики по дням недели -->
+        @foreach (var dayOfWeek in daysOfWeekOrder)
+        {
+            if (Model.Results.Any(r => r.DayOfWeek == dayOfWeek))
+            {
+                <div class="tab-pane fade" id="chartTab@(dayOfWeek.Replace(" ", "-"))">
+                    <canvas id="chartFreq@(dayOfWeek.Replace(" ", "-"))" height="120"></canvas>
+                </div>
+            }
+        }
+
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // Общий график
+    const allLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Results.Select(r => r.DayOfWeek + " - " + r.Number)));
+    const allValues = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Results.Select(r => r.Count)));
+    const allColors = allValues.map(() => 'rgba(54, 162, 235, 0.8)');
+
+    let chartRef = new Chart(document.getElementById('chartFreq'), {
+        type: 'bar',
+        data: {
+            labels: allLabels,
+            datasets: [{
+                label: 'Количество выпадений',
+                data: allValues,
+                backgroundColor: allColors,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+
+    // Графики по дням недели — создаем словарь данных из C#
+    const resultsByDay = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                Model.Results
+                        .GroupBy(r => r.DayOfWeek)
+                        .ToDictionary(g => g.Key, g => g.Select(r => new { r.Number, r.Count }).ToList())
+        ));
+
+    const daysOfWeekOrder = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"];
+    const charts = {};
+
+    daysOfWeekOrder.forEach(day => {
+        const dayResults = resultsByDay[day];
+        if (dayResults && dayResults.length > 0) {
+            const labels = dayResults.map(r => r.Number.toString());
+            const values = dayResults.map(r => r.Count);
+            const colors = values.map(() => 'rgba(54, 162, 235, 0.8)');
+
+            const canvasId = 'chartFreq' + day.replace(/\s/g, '-');
+            charts[canvasId] = new Chart(document.getElementById(canvasId), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Количество выпадений',
+                        data: values,
+                        backgroundColor: colors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+    });
+
+    // Какая вкладка активна сейчас — id canvas'а
+    let activeCanvasId = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const activeTab = document.querySelector('.nav-tabs .nav-link.active');
+        if (activeTab) {
+            const target = activeTab.getAttribute('data-bs-target');
+            activeCanvasId = target === '#chartTab' ? 'chartFreq' : target.replace('#chartTab', 'chartFreq').replace('-', '');
+        }
+
+        document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(btn => {
+            btn.addEventListener('shown.bs.tab', function (e) {
+                const targetSelector = e.target.getAttribute('data-bs-target');
+                activeCanvasId = targetSelector === '#chartTab' ? 'chartFreq' : targetSelector.replace('#chartTab', 'chartFreq').replace('-', '');
+            });
+        });
+    });
+
+    // Скачивание активного графика
+    function downloadChart() {
+        if (!activeCanvasId) {
+            alert('График не инициализирован. Открой вкладку с графиком и повтори скачивание.');
+            return;
+        }
+
+        const chart = charts[activeCanvasId] || (activeCanvasId === 'chartFreq' ? chartRef : null);
+        if (!chart) {
+            alert('График не готов. Попробуйте переключить вкладки.');
+            return;
+        }
+
+        const a = document.createElement("a");
+        a.href = chart.toBase64Image();
+        a.download = activeCanvasId + ".png";
+        a.click();
+    }
+</script>

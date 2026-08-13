@@ -1,0 +1,175 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A65Model
+@{
+    ViewData["Title"] = "6.5 Поиск фигур по заданному паттерну";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <form method="post" class="mb-4">
+        <input type="hidden" name="Game" value="@Model.Game" />
+
+        <input type="hidden" id="selectedPatternInput" name="SelectedPattern" value="@Model.SelectedPattern" />
+
+        <div class="row">
+            <div class="col-md-4">
+                <label for="DrawCount" class="form-label">Количество тиражей (0 - все)</label>
+                <input type="number" name="DrawCount" id="DrawCount" class="form-control" min="0" value="@(Model.DrawCount > 0 ? Model.DrawCount : 0)" />
+            </div>
+            <div class="col-md-4">
+                <label for="Direction" class="form-label">Направление</label>
+                <select name="Direction" id="Direction" class="form-select">
+                    <option value="newToOld" selected="@(Model.Direction == "newToOld")">Сначала новые</option>
+                    <option value="oldToNew" selected="@(Model.Direction == "oldToNew")">Сначала старые</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-primary w-100">Найти фигуры по паттерну</button>
+                @if (Model.PatternMatches != null && Model.PatternMatches.Any()) // Проверка на пустой результат
+                {
+                    <button type="submit" asp-page-handler="DownloadCsv" class="btn btn-success w-100 mt-2">💾 Скачать CSV</button>
+                }
+            </div>
+        </div>
+    </form>
+    <ul class="nav nav-tabs">
+        <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#patternTab">🎨 Паттерн</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#resultsTab">📊 Результаты</button>
+        </li>
+    </ul>
+
+    <div class="tab-content mt-3">
+        <div class="tab-pane fade show active" id="patternTab">
+            <div class="text-center mb-3">
+                <p>Выделите ячейки в таблице для задания паттерна</p>
+                <button class="btn btn-info" onclick="clearSelection()">❌ Очистить выделение</button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-dark table-bordered text-center" id="patternTable" style="width: 100%; table-layout: fixed;">
+                    <tbody>
+                        @for (int i = 0; i < 15; i++)
+                        {
+                            <tr>
+                                @for (int j = 0; j < 15; j++)
+                                {
+                                    <td class="pattern-cell" data-row="@i" data-col="@j" style="height: 30px; width: 30px; cursor: pointer;">*</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="resultsTab">
+            @if (Model.PatternMatches != null)
+            {
+                <div class="table-responsive">
+                    <table class="table table-dark table-bordered text-center">
+                        <thead>
+                            <tr>
+                                <th>Начальный тираж</th>
+                                <th>Начальная позиция</th>
+                                <th>Конечный тираж</th>
+                                <th>Конечная позиция</th>
+                                <th>Числа</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var match in Model.PatternMatches)
+                            {
+                                <tr>
+                                    <td>@match.StartDraw</td>
+                                    <td>@match.StartPosition</td>
+                                    <td>@match.EndDraw</td>
+                                    <td>@match.EndPosition</td>
+                                    <td>@match.Numbers</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <p>Нажмите "Найти фигуры по паттерну", чтобы получить результаты.</p>
+            }
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. Инициализируем selectedCells данными, пришедшими с сервера
+    let selectedCells = [];
+    const patternInput = document.getElementById('selectedPatternInput');
+
+        if (patternInput && patternInput.value) {
+        try {
+            // Пытаемся десериализовать JSON из скрытого поля
+            selectedCells = JSON.parse(patternInput.value);
+
+            // Убираем дубликаты
+            selectedCells = selectedCells.filter((v, i, a) => a.findIndex(t => t.Row === v.Row && t.Col === v.Col) === i);
+
+        } catch (e) {
+            console.error("Ошибка при парсинге SelectedPattern:", e);
+        }
+    }
+
+    // Функция для визуального восстановления выделения
+    function redrawPattern() {
+        // Очищаем все выделения
+        document.querySelectorAll('.pattern-cell').forEach(cell => {
+            cell.style.backgroundColor = '';
+        });
+
+        // Применяем выделение к ячейкам из selectedCells
+        selectedCells.forEach(coord => {
+            const selector = `.pattern-cell[data-row="${coord.Row}"][data-col="${coord.Col}"]`;
+            const cell = document.querySelector(selector);
+            if (cell) {
+                cell.style.backgroundColor = '#007bff';
+            }
+        });
+    }
+
+    // Вызываем восстановление сразу после загрузки скрипта
+    redrawPattern();
+
+    // 2. Обработчики кликов по ячейкам (Оставляем как есть, они работают)
+    document.querySelectorAll('.pattern-cell').forEach(cell => {
+        cell.addEventListener('click', function() {
+            const Row = parseInt(this.getAttribute('data-row'));
+            const Col = parseInt(this.getAttribute('data-col'));
+
+            const cellIndex = selectedCells.findIndex(c => c.Row === Row && c.Col === Col);
+            if (cellIndex > -1) {
+                selectedCells.splice(cellIndex, 1);
+                this.style.backgroundColor = '';
+            } else {
+                selectedCells.push({ Row: Row, Col: Col });
+                this.style.backgroundColor = '#007bff';
+            }
+        });
+    });
+
+    // 3. Очистка выделения
+    function clearSelection() {
+        selectedCells = [];
+        document.querySelectorAll('.pattern-cell').forEach(cell => {
+            cell.style.backgroundColor = '';
+        });
+    }
+
+    // 4. При отправке формы (Оставляем как есть, теперь input не пуст)
+    document.querySelector('form').addEventListener('submit', function() {
+        const input = document.getElementById('selectedPatternInput');
+        input.value = JSON.stringify(selectedCells);
+    });
+</script>

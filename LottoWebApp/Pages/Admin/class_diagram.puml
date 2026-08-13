@@ -1,0 +1,48 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam class {
+    BackgroundColor<<External>> #EFEFEF
+    BorderColor<<External>> #Gray
+    FontColor<<External>> #Gray
+}
+class DashboardModel {
+  +List~UserListItem~ Users
+  +List~AdminListItem~ Admins
+  +SystemStats Stats
+  +OnGetAsync()
+  +OnPostAddUserAsync()
+  +OnPostLogoutAsync()
+  +OnPostDeleteUserAsync(int)
+  +OnPostUpdateUserEncryptionKeyAsync(int)
+  +OnPostAddAdminAsync()
+  +OnPostDeleteAdminAsync(int)
+  +OnPostUpdateAdminEncryptionKeyAsync(int)
+  +OnPostEditMyProfileAsync()
+}
+class PageModel <<External>> {
+  (external)
+}
+PageModel <|-- DashboardModel
+class UserListItem {
+  +int Id
+  +string Login
+  +DateTime? LastLogin
+  +bool Activity
+}
+class AdminListItem {
+  +int Id
+  +string Login
+  +DateTime? LastLogin
+  +bool Activity
+}
+class SystemStats {
+  +int CpuUsage
+  +double RamUsed
+  +double RamTotal
+  +int DiskCUsedPercent
+  +int DiskDUsedPercent
+  +int DiskReadSpeed
+  +int DiskWriteSpeed
+}
+@enduml

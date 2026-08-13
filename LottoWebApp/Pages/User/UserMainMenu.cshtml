@@ -1,0 +1,371 @@
+﻿@page
+@model LottoWebApp.Pages.User.UserMainMenuModel
+@{
+    ViewData["Title"] = "Главное меню пользователя";
+}
+<div class="container-fluid mt-4">
+    <!-- Кнопки сверху -->
+    <div class="mb-3">
+        <a asp-page="/User/UserProfile" class="btn btn-primary me-2">Редактировать профиль</a>
+        <a href="/User/Logout" class="btn btn-secondary">Выход</a>
+    </div>
+    <h1>@ViewData["Title"]</h1>
+    <!-- Блок выбора игры -->
+    <div class="mb-3">
+        <label for="gameSelector" class="form-label fw-bold">Выберите игру для анализа:</label>
+        <select id="gameSelector" class="form-select w-auto d-inline-block" onchange="changeGame()">
+            <option value="keno">КЕНО (20 из 60)</option>
+            <option value="blitz">БЛИЦ (8 из 20 + 1 из 4)</option>
+            <option value="5x36">5 из 36</option>
+            <option value="6x49">6 из 49</option>
+            <option value="1224">12 из 24</option>
+            <option value="320">3+3 (3 из 20 + 3 из 20)</option>
+        </select>
+    </div>
+    <!-- Блок выбора количества тиражей -->
+    <div class="mb-4">
+        <label for="drawCountSelector" class="form-label fw-bold">Количество тиражей для анализа:</label>
+        <select id="drawCountSelector" class="form-select w-auto d-inline-block" onchange="customDrawCountChanged()">
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="150">150</option>
+            <option value="200">200</option>
+            <option value="500">500</option>
+            <option value="1000">1000</option>
+            <option value="2000">2000</option>
+            <option value="2500">2500</option>
+            <option value="5000">5000</option>
+            <option value="7500">7500</option>
+            <option value="10000">10000</option>
+            <option value="15000">15000</option>
+            <option value="20000">20000</option>
+            <option value="25000">25000</option>
+            <option value="all">Все тиражи</option>
+            <option value="custom">Другое...</option>
+        </select>
+        <!-- скрытое поле для "Другое..." -->
+        <div id="customDrawContainer" class="mt-2" style="display:none;">
+            <label for="customDrawInput">Введите количество:</label>
+            <input type="number" id="customDrawInput" class="form-control" min="1" placeholder="Например, 250" />
+        </div>
+    </div>
+    <!--  Блок выбора направления анализа -->
+    <div class="mb-4">
+        <label class="form-label fw-bold">Направление выбора тиражей:</label>
+        <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="drawDirection" id="directionOldToNew" value="oldToNew" checked>
+            <label class="form-check-label" for="directionOldToNew">Сначала старые</label>
+        </div>
+        <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="drawDirection" id="directionNewToOld" value="newToOld">
+            <label class="form-check-label" for="directionNewToOld">Сначала новые</label>
+        </div>
+    </div>
+    <!-- Навигация по вкладкам -->
+    <nav>
+        <div class="nav nav-tabs" id="userMenuTab" role="tablist">
+            <button class="nav-link active" id="tab-general-tab" data-bs-toggle="tab" data-bs-target="#tab-general" type="button" role="tab">Общие характеристики</button>
+            <button class="nav-link" id="tab-frequency-tab" data-bs-toggle="tab" data-bs-target="#tab-frequency" type="button" role="tab">Частотный анализ</button>
+            <button class="nav-link" id="tab-tables-tab" data-bs-toggle="tab" data-bs-target="#tab-tables" type="button" role="tab">Табличные карты</button>
+            <button class="nav-link" id="tab-dossier-tab" data-bs-toggle="tab" data-bs-target="#tab-dossier" type="button" role="tab">Досье</button>
+            <button class="nav-link" id="tab-data-tab" data-bs-toggle="tab" data-bs-target="#tab-data" type="button" role="tab">Таблицы</button>
+            <button class="nav-link" id="tab-figures-tab" data-bs-toggle="tab" data-bs-target="#tab-figures" type="button" role="tab">Поиск фигур</button>
+        </div>
+    </nav>
+    <!-- Контент вкладок -->
+    <div class="tab-content mt-3" id="userMenuTabContent">
+        <div class="tab-pane fade show active" id="tab-general" role="tabpanel">
+            <h2>Общие характеристики</h2>
+            <div id="buttons-general" class="mb-3"></div>
+        </div>
+        <div class="tab-pane fade" id="tab-frequency" role="tabpanel">
+            <h2>Частотный анализ</h2>
+            <div id="buttons-frequency" class="mb-3"></div>
+        </div>
+        <div class="tab-pane fade" id="tab-tables" role="tabpanel">
+            <h2>Табличные карты</h2>
+            <div id="buttons-tables" class="mb-3"></div>
+        </div>
+        <div class="tab-pane fade" id="tab-dossier" role="tabpanel">
+            <h2>Досье</h2>
+            <div id="buttons-dossier" class="mb-3"></div>
+        </div>
+        <div class="tab-pane fade" id="tab-data" role="tabpanel">
+            <h2>Таблицы</h2>
+            <div id="buttons-data" class="mb-3"></div>
+        </div>
+        <div class="tab-pane fade" id="tab-figures" role="tabpanel">
+            <h2>Поиск фигур</h2>
+            <div id="buttons-figures" class="mb-3"></div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Общие массивы данных
+        const generalBase = [
+            "1.1 Вывод всех тиражей как есть",
+            "1.2 Вывод всех тиражей упорядоченный",
+            "1.3 Вывод общих характеристик",
+            "1.4 Вывод 10 частых и редких чисел",
+            "1.5 Вывод 10 частых и редких чисел по дням недели",
+            "1.6 Вывод 10 частых и редких чисел по месяцам",
+            "1.7 Вывод 10 частых и редких чисел по дню месяца",
+            "1.8 Вывод 10 частых и редких чисел по году",
+            "1.9 Вывод 10 частых и редких чисел по дню месяца и дню недели",
+            "1.10 Вывод 10 частых и редких чисел по месяцу дню месяца и недели",
+            "1.11 Вывод частоты и шанса выпадения каждого числа от позиции"
+        ];
+        const generalWithExtra = generalBase.concat([
+            "1.12 Вывод частоты и шанса выпадения дополнительного шара",
+            "1.13 Вывод частоты и шанса выпадения дополнительного шара по дням недели",
+            "1.14 Вывод частоты и шанса выпадения дополнительного шара по месяцам",
+            "1.15 Вывод частоты и шанса выпадения дополнительного шара по дню месяца",
+            "1.16 Вывод частоты и шанса выпадения дополнительного шара по году",
+            "1.17 Вывод частоты и шанса выпадения дополнительного шара по дню месяца и дню недели",
+            "1.18 Вывод частоты и шанса выпадения дополнительного шара по месяцу дню месяца и недели"
+        ]);
+        const frequency = [
+            "2.1 Общая частота 10 50 100",
+            "2.2 Общая частота 10 50 100 наиболее часто",
+            "2.3 Карта пауз чисел"
+        ];
+        const tables = [
+            "3.1 Карта выпадения чисел",
+            "3.2 Карта распределения выпадения",
+            "3.3 Карта выпадения комбинаций чисел",
+            "3.4 Карта разниц между всеми/соседними позициями",
+            "3.5 Карта четности и нечетности",
+            "3.6 Карта распределения четности и нечетности",
+            "3.7 Карта распределения частоты",
+            "3.8 Карта выпадения чисел согласно билету",
+            "3.9 Карта выпадения чисел согласно билету закрытие",
+            "3.10 Карта распределения четных и нечетных чисел по строкам",
+            "3.11 Карта распределения числовых комбинаций по колонкам",
+            "3.12 Карта распределения четных и нечетных чисел в квадратах 2х2",
+            "3.13 Карта распределения сумм чисел",
+            "3.14 Карта распределения среднего числа и медианы",
+            "3.15 Карта распределения дисперсии и СКО",
+            "3.16 Карта распределения минимального и максимального чисел",
+            "3.17 Карта распределения простых и составных чисел",
+            "3.18 Карта распределения низких и высоких чисел",
+            "3.19 Карта распределения треугольных квадратных зеркальных чисел",
+            "3.20 Карта распределения пауз",
+            "3.21 Карта переходов выпадения комбинации на каждый тираж"
+        ];
+        const dossier = [
+            "4.1 Досье на число",
+            "4.2 Досье на комбинацию"
+        ];
+        const dataBase = [
+            "5.1 Таблицы переходов из числа в число (как есть/упорядоченные)",
+            "5.2 Таблицы переходов по интервалам и позициям",
+            "5.3 Таблицы переходов № шара на другие № через интервалы",
+            "5.4 Таблица чисел по позициям"
+        ];
+        const figures = [
+            "6.1 Горизонтальные или вертикальные линии",
+            "6.2 Диагональные линии слева направо/справа налево",
+            "6.3 Горизонтальные и вертикальные линии",
+            "6.4 Горизонтальные вертикальные диагональные линии",
+            "6.5 Задать паттерн фигуры для поиска"
+        ];
+        // Объект с кнопками по играм
+        const buttonsByGame = {
+            "keno": {
+                general: generalBase,
+                frequency: frequency,
+                tables: tables,
+                dossier: dossier,
+                data: dataBase,
+                figures: figures
+            },
+            "blitz": {
+                general: generalWithExtra,
+                frequency: frequency,
+                tables: tables,
+                dossier: dossier,
+                data: dataBase,
+                figures: figures
+            },
+            "5x36": {
+                general: generalBase,
+                frequency: frequency,
+                tables: tables,
+                dossier: dossier,
+                data: dataBase,
+                figures: figures
+            },
+            "6x49": {
+                general: generalBase,
+                frequency: frequency,
+                tables: tables,
+                dossier: dossier,
+                data: dataBase,
+                figures: figures
+            },
+            "1224": {
+                general: generalBase,
+                frequency: frequency,
+                tables: tables,
+                dossier: dossier,
+                data: dataBase,
+                figures: figures
+            },
+            "320": {
+                general: generalBase,
+                frequency: frequency,
+                tables: tables,
+                dossier: dossier,
+                data: dataBase,
+                figures: figures
+            }
+        };
+            let selectedDrawCount = 100;
+        let drawDirection = "oldToNew";
+        function renderButtons(containerId, buttonList) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = "";
+            buttonList.forEach(name => {
+                const btn = document.createElement("button");
+                btn.className = "btn btn-outline-primary me-2 mb-2";
+                btn.textContent = name;
+                btn.title = `Анализ на ${selectedDrawCount} тиражей (${drawDirection === "oldToNew" ? "от старых" : "от новых"})`;
+                btn.dataset.algorithmName = name;
+                container.appendChild(btn);
+            });
+        }
+                function updateDrawCountOptions() {
+            const gameSelector = document.getElementById('gameSelector');
+            const drawCountSelector = document.getElementById('drawCountSelector');
+            const selectedGame = gameSelector.value.toLowerCase();
+            const allOption = drawCountSelector.querySelector('option[value="all"]');
+            if (allOption) {
+                if (selectedGame === 'blitz' || selectedGame === '1224') {
+                    // Скрываем опцию "Все тиражи" для БЛИЦ и 12/24
+                    allOption.style.display = 'none';
+                    allOption.disabled = true;
+                    // Если "Все тиражи" был выбран, выберем первую доступную опцию
+                    if (drawCountSelector.value === 'all') {
+                         // Выбираем первую видимую и доступную опцию
+                         const firstAvailable = Array.from(drawCountSelector.options).find(opt => opt.style.display !== 'none' && opt.value !== 'custom' && !opt.disabled);
+                         if (firstAvailable) {
+                             drawCountSelector.value = firstAvailable.value;
+                         }
+                    }
+                } else {
+                    allOption.style.display = '';
+                    allOption.disabled = false;
+                }
+            }
+        }
+                function changeGame() {
+            const game = document.getElementById("gameSelector").value;
+            const data = buttonsByGame[game];
+            updateDrawCountOptions();
+            renderButtons("buttons-general", data.general);
+            renderButtons("buttons-frequency", data.frequency);
+            renderButtons("buttons-tables", data.tables);
+            renderButtons("buttons-dossier", data.dossier);
+            renderButtons("buttons-data", data.data);
+            renderButtons("buttons-figures", data.figures);
+            // Удаляем кнопки для игр 12/24 и БЛИЦ
+            if (game === "blitz" || game === "1224" ||  game === "320") {
+                // Удаляем 1.2
+                document.querySelectorAll('#buttons-general .btn').forEach(btn => {
+                    if (btn.textContent.trim().startsWith("1.2 ")) btn.remove();
+                });
+            }
+            attachButtonEventListeners();
+        }
+        function customDrawCountChanged() {
+            const selector = document.getElementById("drawCountSelector");
+            const customContainer = document.getElementById("customDrawContainer");
+            if (selector.value === "custom") {
+                customContainer.style.display = "block";
+                document.getElementById("customDrawInput").focus();
+            } else {
+                customContainer.style.display = "none";
+                selectedDrawCount = parseInt(selector.value);
+                changeGame();
+            }
+        }
+        function applyCustomDrawCount() {
+            const customInput = document.getElementById("customDrawInput");
+            const val = parseInt(customInput.value);
+            if (!isNaN(val) && val > 0) {
+                selectedDrawCount = val;
+                changeGame();
+            }
+        }
+        function attachButtonEventListeners() {
+            document.querySelectorAll('#userMenuTabContent .btn-outline-primary[data-algorithm-name]').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const algorithmName = this.dataset.algorithmName;
+                    const game = document.getElementById("gameSelector").value;
+                    const drawCountSelector = document.getElementById("drawCountSelector");
+                    const customDrawInput = document.getElementById("customDrawInput");
+                    const directionRadio = document.querySelector('input[name="drawDirection"]:checked');
+                    // Извлекаем номер страницы из текста кнопки, например "1.1" - "A11"
+                    const match = algorithmName.match(/^(\d+)\.(\d+)/);
+                    if (!match) {
+                        alert("Не удалось определить номер страницы для: " + algorithmName);
+                        return;
+                    }
+                    const pageCode = `A${match[1]}${match[2]}`;
+                    // Обработка количества тиражей
+                    let drawCountValue = drawCountSelector.value;
+                    if (drawCountValue === "custom") {
+                        const customValue = parseInt(customDrawInput.value);
+                        if (!isNaN(customValue) && customValue > 0)
+                            drawCountValue = customValue.toString();
+                        else
+                            drawCountValue = "100";
+                    }
+                    const direction = directionRadio.value;
+                    // Формируем ссылку на Razor-страницу
+                    const url = new URL(`/Analysis/${pageCode}`, window.location.origin);
+                    url.searchParams.set('game', game);
+                    if (drawCountValue !== "all") url.searchParams.set('drawCount', drawCountValue);
+                    url.searchParams.set('direction', direction);
+                    // Переход
+                    console.log("Переход на:", url.toString());
+                    window.location.href = url.toString();
+                });
+            });
+        }
+        document.addEventListener("DOMContentLoaded", () => {
+            document.querySelectorAll('input[name="drawDirection"]').forEach(radio => {
+                radio.addEventListener("change", e => {
+                    drawDirection = e.target.value;
+                    // Обновляем подсказки на кнопках
+                    document.querySelectorAll('#userMenuTabContent .btn-outline-primary').forEach(btn => {
+                        btn.title = `Анализ на ${selectedDrawCount} тиражей (${drawDirection === "oldToNew" ? "от старых" : "от новых"})`;
+                    });
+                });
+            });
+            // Инициализация при первой загрузке
+            changeGame();
+            // --- Назначаем обработчики для изменения количества тиражей ---
+            document.getElementById("drawCountSelector").addEventListener("change", function () {
+                customDrawCountChanged();
+                // Обновляем подсказки на кнопках после изменения количества
+                const newCount = this.value === "all" ? "Все" : (this.value === "custom" ? document.getElementById("customDrawInput").value : this.value);
+                document.querySelectorAll('#userMenuTabContent .btn-outline-primary').forEach(btn => {
+                    btn.title = `Анализ на ${newCount} тиражей (${drawDirection === "oldToNew" ? "от старых" : "от новых"})`;
+                });
+            });
+            document.getElementById("customDrawInput").addEventListener("change", function () {
+                applyCustomDrawCount();
+                // Обновляем подсказки на кнопках после изменения пользовательского количества
+                document.querySelectorAll('#userMenuTabContent .btn-outline-primary').forEach(btn => {
+                    btn.title = `Анализ на ${this.value} тиражей (${drawDirection === "oldToNew" ? "от старых" : "от новых"})`;
+                });
+            });
+        });
+    </script>
+}
+

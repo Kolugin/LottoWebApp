@@ -1,0 +1,183 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A32Model
+@{
+    ViewData["Title"] = "3.2 Карта распределения выпадения";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <form method="post" class="mb-4">
+        <input type="hidden" name="Game" value="@Model.Game" />
+        <div class="row">
+            <div class="col-md-3">
+                <label for="DrawCount" class="form-label">Количество тиражей (0 - все)</label>
+                <input type="number" name="DrawCount" id="DrawCount" class="form-control" min="0" value="@(Model.DrawCount > 0 ? Model.DrawCount : 0)" />
+            </div>
+            <div class="col-md-3">
+                <label for="Direction" class="form-label">Направление</label>
+                <select name="Direction" id="Direction" class="form-select">
+                    <option value="newToOld" selected="@(Model.Direction == "newToOld")">Сначала новые</option>
+                    <option value="oldToNew" selected="@(Model.Direction == "oldToNew")">Сначала старые</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="EnableSorting" class="form-label">Упорядоченная карта</label>
+                <select name="EnableSorting" id="EnableSorting" class="form-select" @(Model.IsAlwaysUnordered ? "disabled" : "")>
+                    <option value="false" selected="@(Model.EnableSorting == false)">Нет</option>
+                    <option value="true" selected="@(Model.EnableSorting == true)">Да</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100">Построить карту</button>
+                @if (Model.DistributionData != null)
+                {
+                    <button type="submit" asp-page-handler="DownloadCsv" class="btn btn-success w-100 mt-2">💾 Скачать CSV</button>
+                }
+            </div>
+        </div>
+    </form>
+
+    @if (Model.DistributionData != null)
+    {
+        <ul class="nav nav-tabs">
+            <li class="nav-item">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tableTab">📋 Таблица</button>
+            </li>
+            @for (int pos = 1; pos <= Model.NumberOfBalls; pos++)
+            {
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab@(pos)">📊 Позиция @pos</button>
+                </li>
+            }
+        </ul>
+
+        <div class="tab-content mt-3">
+            <div class="tab-pane fade show active" id="tableTab">
+                <div class="table-responsive">
+                    <table class="table table-dark table-bordered text-center">
+                        <thead>
+                            <tr>
+                                <th>Число</th>
+                                @for (int pos = 1; pos <= Model.NumberOfBalls; pos++)
+                                {
+                                    <th>П@(pos)</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (int number = 1; number <= Model.MaxBallNumber; number++)
+                            {
+                                <tr>
+                                    <th>@number</th>
+                                    @for (int pos = 0; pos < Model.NumberOfBalls; pos++)
+                                    {
+                                        var count = Model.DistributionData.TryGetValue((number, pos), out int c) ? c : 0;
+                                        <td>@count</td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            @for (int pos = 1; pos <= Model.NumberOfBalls; pos++)
+            {
+                <div class="tab-pane fade" id="chartTab@(pos)">
+                    <canvas id="chartPos@(pos)" height="120"></canvas>
+                    <button class="btn btn-info mt-2" onclick="downloadChart('chartPos@(pos)', 'A32_distribution_pos@(pos).png')">📥 Скачать PNG</button>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+
+    @if (Model.DistributionData != null)
+    {
+            var countsByPos = new List<int[]>();
+            for (int pos = 0; pos < Model.NumberOfBalls; pos++)
+            {
+                    var arr = new int[Model.MaxBallNumber];
+                    for (int number = 1; number <= Model.MaxBallNumber; number++)
+                    {
+                            // Model.DistributionData ключи — (number, posIndex)
+                            arr[number - 1] = Model.DistributionData.TryGetValue((number, pos), out var c) ? c : 0;
+                    }
+                    countsByPos.Add(arr);
+            }
+            <text>
+                const countsByPos = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(countsByPos));
+                const maxBallNumber = @Model.MaxBallNumber;
+                const numberOfBalls = @Model.NumberOfBalls;
+            </text>
+    }
+    else
+    {
+            <text>
+                const countsByPos = [];
+                const maxBallNumber = 0;
+                const numberOfBalls = 0;
+            </text>
+    }
+
+    // Рендер графиков — создаём по одному canvas для каждой позиции, предполагается что в разметке уже есть canvas с id="chartPos1", "chartPos2", ...
+    (function renderAllPositionCharts() {
+        if (!countsByPos || countsByPos.length === 0) return;
+
+        for (let posIndex = 0; posIndex < countsByPos.length; posIndex++) {
+            const counts = countsByPos[posIndex]; // массив длины maxBallNumber
+            const canvasId = 'chartPos' + (posIndex + 1);
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) {
+                console.warn('Canvas not found:', canvasId);
+                continue;
+            }
+
+            const ctx = canvas.getContext('2d');
+
+            // если уже есть chart на этом элементе, удаляем (на случай повторного рендера)
+            try {
+                const existing = Chart.getChart(canvasId);
+                if (existing) existing.destroy();
+            } catch (e) { /* ignore */ }
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Array.from({ length: maxBallNumber }, (_, i) => i + 1),
+                    datasets: [{
+                        label: 'Количество выпадений в позиции ' + (posIndex + 1),
+                        data: counts,
+                        backgroundColor: 'rgba(54, 162, 235, 0.8)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+    })();
+
+    // Функция скачивания (как у вас была)
+    function downloadChart(canvasId, filename) {
+        const chart = Chart.getChart(canvasId);
+        if (chart) {
+            const link = document.createElement('a');
+            link.href = chart.toBase64Image();
+            link.download = filename;
+            link.click();
+        } else {
+            alert('График не найден: ' + canvasId);
+        }
+    }
+</script>
+

@@ -1,0 +1,86 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A64Model
+@{
+    ViewData["Title"] = "6.4 Горизонтальные, вертикальные, диагональные линии";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <form method="post" class="mb-4">
+        <input type="hidden" name="Game" value="@Model.Game" />
+        <div class="row g-3">
+            <div class="col-md-2">
+                <label for="DrawCount" class="form-label small-label">Количество тиражей (0 - все)</label>
+                <input type="number" name="DrawCount" id="DrawCount" class="form-control" min="0" value="@(Model.DrawCount > 0 ? Model.DrawCount : 0)" />
+            </div>
+            <div class="col-md-2">
+                <label for="Direction" class="form-label small-label">Направление</label>
+                <select name="Direction" id="Direction" class="form-select">
+                    <option value="newToOld" selected="@(Model.Direction == "newToOld")">Сначала новые</option>
+                    <option value="oldToNew" selected="@(Model.Direction == "oldToNew")">Сначала старые</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="MinHorizontalLineLength" class="form-label small-label">Мин. длина горизонтальной</label>
+                <input type="number" name="MinHorizontalLineLength" id="MinHorizontalLineLength" class="form-control" min="2" value="@(Model.MinHorizontalLineLength > 1 ? Model.MinHorizontalLineLength : 2)" />
+            </div>
+            <div class="col-md-2">
+                <label for="MinVerticalLineLength" class="form-label small-label">Мин. длина вертикальной</label>
+                <input type="number" name="MinVerticalLineLength" id="MinVerticalLineLength" class="form-control" min="2" value="@(Model.MinVerticalLineLength > 1 ? Model.MinVerticalLineLength : 2)" />
+            </div>
+            <div class="col-md-2">
+                <label for="MinDiagonalLineLength" class="form-label small-label">Мин. длина диагональной</label>
+                <input type="number" name="MinDiagonalLineLength" id="MinDiagonalLineLength" class="form-control" min="2" value="@(Model.MinDiagonalLineLength > 1 ? Model.MinDiagonalLineLength : 2)" />
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <div class="w-100">
+                    <button type="submit" class="btn btn-primary w-100">Найти линии</button>
+                    @if (Model.Lines != null)
+                    {
+                        <button type="submit" asp-page-handler="DownloadCsv" class="btn btn-success w-100 mt-2">💾 CSV</button>
+                    }
+                </div>
+            </div>
+        </div>
+    </form>
+
+    @if (Model.Lines != null)
+    {
+        <div class="table-responsive">
+            <table class="table table-dark table-bordered text-center">
+                <thead>
+                    <tr>
+                        <th>Начальная позиция</th>
+                        <th>Конечная позиция</th>
+                        <th>Начальный тираж</th>
+                        <th>Конечный тираж</th>
+                        <th>Тип линии</th>
+                        <th>Числа</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var line in Model.Lines)
+                    {
+                        <tr>
+                            <td>@line.StartPosition</td>
+                            <td>@line.EndPosition</td>
+                            <td>@line.StartDraw</td>
+                            <td>@line.EndDraw</td>
+                            <td>@line.LineType</td>
+                            <td>@line.Numbers</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<style>
+    .small-label {
+        font-size: 0.85rem;
+    }
+</style>

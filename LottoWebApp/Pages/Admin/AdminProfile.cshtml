@@ -1,0 +1,133 @@
+﻿@page
+@model LottoWebApp.Pages.Admin.AdminProfileModel
+@{
+    ViewData["Title"] = "Профиль администратора";
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-person-badge"></i> @ViewData["Title"]</h2>
+        <a href="/Admin/Dashboard" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Назад в панель управления
+        </a>
+    </div>
+
+    @* Вывод сообщений об успехе или ошибке *@
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="row">
+        <div class="col-md-8">
+            <form method="post" class="mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Редактировать данные</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label asp-for="Input.Login" class="form-label">Логин (псевдоним)</label>
+                            <input type="text" asp-for="Input.Login" class="form-control" />
+                            <span asp-validation-for="Input.Login" class="text-danger"></span>
+                        </div>
+
+                        @* Секция Email (если есть в модели Admin) *@
+                        <div class="mb-3">
+                            <label asp-for="Input.Email" class="form-label">Рабочий Email</label>
+                            <input type="email" asp-for="Input.Email" class="form-control" />
+                            <span asp-validation-for="Input.Email" class="text-danger"></span>
+                        </div>
+
+                        <button type="submit" asp-page-handler="UpdateProfile" class="btn btn-primary">
+                            Обновить данные
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <form method="post" class="mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning">
+                        <h5 class="mb-0 text-dark">Безопасность: Смена пароля</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label asp-for="ChangePasswordInput.OldPassword" class="form-label">Текущий пароль</label>
+                            <input type="password" asp-for="ChangePasswordInput.OldPassword" class="form-control" />
+                            <span asp-validation-for="ChangePasswordInput.OldPassword" class="text-danger"></span>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="ChangePasswordInput.NewPassword" class="form-label">Новый пароль</label>
+                                <input type="password" asp-for="ChangePasswordInput.NewPassword" class="form-control" />
+                                <span asp-validation-for="ChangePasswordInput.NewPassword" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="ChangePasswordInput.ConfirmNewPassword" class="form-label">Повторите пароль</label>
+                                <input type="password" asp-for="ChangePasswordInput.ConfirmNewPassword" class="form-control" />
+                                <span asp-validation-for="ChangePasswordInput.ConfirmNewPassword" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <button type="submit" asp-page-handler="ChangePassword" class="btn btn-warning">Изменить пароль</button>
+                    </div>
+                </div>
+            </form>
+
+            <form method="post" onsubmit="return confirm('ВНИМАНИЕ! Вы удаляете учетную запись администратора. Вы потеряете доступ к этой панели. Продолжить?');">
+                <div class="card border-danger mb-4 shadow-sm">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="text-danger mb-1">Удаление аккаунта</h5>
+                            <p class="text-muted small mb-0">Это действие нельзя будет отменить.</p>
+                        </div>
+                        <button type="submit" asp-page-handler="DeleteAccount" class="btn btn-danger">Удалить мой профиль</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 bg-light">
+                <div class="card-body">
+                    <h5 class="card-title border-bottom pb-2">Системная информация</h5>
+                    <dl class="row mb-0 mt-3">
+                        <dt class="col-sm-5">ID:</dt>
+                        <dd class="col-sm-7">#@Model.Id</dd>
+
+                        <dt class="col-sm-5">Статус:</dt>
+                        <dd class="col-sm-7">
+                            <span class="badge @(Model.Activity ? "bg-success" : "bg-secondary")">
+                                @(Model.Activity ? "В сети" : "Оффлайн")
+                            </span>
+                        </dd>
+
+                        <dt class="col-sm-5">Вход:</dt>
+                        <dd class="col-sm-7 small">@(Model.LastLogin?.ToString("dd.MM.yyyy HH:mm") ?? "Нет данных")</dd>
+
+                        <dt class="col-sm-5 text-truncate">Ключ AES:</dt>
+                        <dd class="col-sm-7"><span class="badge bg-dark text-white">Активен</span></dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="alert alert-info mt-3 small shadow-sm">
+                <i class="bi bi-info-circle"></i> Все ваши персональные данные шифруются по алгоритму <strong>AES-256</strong> перед сохранением в базу данных.
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

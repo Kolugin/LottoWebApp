@@ -1,0 +1,383 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A37Model
+@{
+    ViewData["Title"] = "3.7 Карта распределения частоты";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <form method="post" class="mb-4">
+        <input type="hidden" name="Game" value="@Model.Game" />
+        <div class="row">
+            <div class="col-md-4">
+                <label for="DrawCount" class="form-label">Количество тиражей (0 - все)</label>
+                <input type="number" name="DrawCount" id="DrawCount" class="form-control" min="0" value="@(Model.DrawCount > 0 ? Model.DrawCount : 0)" />
+            </div>
+            <div class="col-md-4">
+                <label for="Direction" class="form-label">Направление</label>
+                <select name="Direction" id="Direction" class="form-select">
+                    <option value="newToOld" selected="@(Model.Direction == "newToOld")">Сначала новые</option>
+                    <option value="oldToNew" selected="@(Model.Direction == "oldToNew")">Сначала старые</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-primary w-100">Построить карту распределения</button>
+                @if (Model.IntervalTables.Any())
+                {
+                    <button type="submit" asp-page-handler="DownloadCsv" class="btn btn-success w-100 mt-2">💾 Скачать CSV</button>
+                }
+            </div>
+        </div>
+    </form>
+
+    @if (Model.IntervalTables.Any())
+    {
+        <ul class="nav nav-tabs">
+            <li class="nav-item">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#table10">📋 10 тиражей</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#table50">📋 50 тиражей</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#table100">📋 100 тиражей</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#chart10">📊 График 10</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#chart50">📊 График 50</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#chart100">📊 График 100</button>
+            </li>
+        </ul>
+
+        <div class="tab-content mt-3">
+            <div class="tab-pane fade show active" id="table10">
+                <h3>Карта распределения частоты за 10 тиражей</h3>
+                @if (Model.IntervalTables.ContainsKey(10))
+                {
+                    <div class="table-responsive">
+                        <table class="table table-dark table-bordered text-center">
+                            <thead>
+                                <tr>
+                                    <th>№ Тиражей</th>
+                                    @for (int i = 1; i <= Model.NumberOfBalls; i++)
+                                    {
+                                        <th>№Поз @i</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in Model.IntervalTables[10])
+                                {
+                                    <tr>
+                                        <td>@row.TicketRange</td>
+                                        @for (int i = 1; i <= Model.NumberOfBalls; i++)
+                                        {
+                                            var prob = row.Positions.TryGetValue(i, out var p) ? p : "-";
+                                            <td class="@(Model.GetColorClassForValue(p, i))">@prob</td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+
+            <div class="tab-pane fade" id="table50">
+                <h3>Карта распределения частоты за 50 тиражей</h3>
+                @if (Model.IntervalTables.ContainsKey(50))
+                {
+                    <div class="table-responsive">
+                        <table class="table table-dark table-bordered text-center">
+                            <thead>
+                                <tr>
+                                    <th>№ Тиражей</th>
+                                    @for (int i = 1; i <= Model.NumberOfBalls; i++)
+                                    {
+                                        <th>№Поз @i</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in Model.IntervalTables[50])
+                                {
+                                    <tr>
+                                        <td>@row.TicketRange</td>
+                                        @for (int i = 1; i <= Model.NumberOfBalls; i++)
+                                        {
+                                            var prob = row.Positions.TryGetValue(i, out var p) ? p : "-";
+                                            <td class="@(Model.GetColorClassForValue(p, i))">@prob</td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+
+            <div class="tab-pane fade" id="table100">
+                <h3>Карта распределения частоты за 100 тиражей</h3>
+                @if (Model.IntervalTables.ContainsKey(100))
+                {
+                    <div class="table-responsive">
+                        <table class="table table-dark table-bordered text-center">
+                            <thead>
+                                <tr>
+                                    <th>№ Тиражей</th>
+                                    @for (int i = 1; i <= Model.NumberOfBalls; i++)
+                                    {
+                                        <th>№Поз @i</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in Model.IntervalTables[100])
+                                {
+                                    <tr>
+                                        <td>@row.TicketRange</td>
+                                        @for (int i = 1; i <= Model.NumberOfBalls; i++)
+                                        {
+                                            var prob = row.Positions.TryGetValue(i, out var p) ? p : "-";
+                                            <td class="@(Model.GetColorClassForValue(p, i))">@prob</td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+
+            <div class="tab-pane fade" id="chart10">
+                @if (Model.IntervalTables.ContainsKey(10))
+                {
+                    <h3>График распределения частоты за 10 тиражей</h3>
+                    <canvas id="chart10Canvas" height="120"></canvas>
+                    <form method="post" asp-page-handler="DownloadChart" asp-route-interval="10">
+                        <button type="submit" class="btn btn-info mt-2">📥 Скачать (PNG)</button>
+                    </form>
+                }
+            </div>
+
+            <div class="tab-pane fade" id="chart50">
+                @if (Model.IntervalTables.ContainsKey(50))
+                {
+                    <h3>График распределения частоты за 50 тиражей</h3>
+                    <canvas id="chart50Canvas" height="120"></canvas>
+                    <form method="post" asp-page-handler="DownloadChart" asp-route-interval="50">
+                        <button type="submit" class="btn btn-info mt-2">📥 Скачать (PNG)</button>
+                    </form>
+                }
+            </div>
+
+            <div class="tab-pane fade" id="chart100">
+                @if (Model.IntervalTables.ContainsKey(100))
+                {
+                    <h3>График распределения частоты за 100 тиражей</h3>
+                    <canvas id="chart100Canvas" height="120"></canvas>
+                    <form method="post" asp-page-handler="DownloadChart" asp-route-interval="100">
+                        <button type="submit" class="btn btn-info mt-2">📥 Скачать (PNG)</button>
+                    </form>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // ====== 10 ТИРАЖЕЙ ======
+    @if (Model.IntervalTables.ContainsKey(10))
+    {
+            var allValues10 = Model.IntervalTables[10]
+                    .SelectMany(r => r.Positions.Values)
+                    .Select(v =>
+                    {
+                            double val;
+                            return double.TryParse(v?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out val)
+                                    ? Math.Round(val, 2)
+                                    : (double?)null;
+                    })
+                    .Where(v => v.HasValue)
+                    .Select(v => v.Value)
+                    .ToList();
+
+            var frequencyGroups10 = allValues10
+                    .GroupBy(v => v)
+                    .OrderBy(g => g.Key)
+                    .ToDictionary(g => g.Key, g => g.Count());
+
+            // Преобразуем подписи в формат с запятой
+            var freqLabels10 = System.Text.Json.JsonSerializer.Serialize(
+                    frequencyGroups10.Keys.Select(k => k.ToString("0.##", System.Globalization.CultureInfo.GetCultureInfo("ru-RU")))
+            );
+            var freqCounts10 = System.Text.Json.JsonSerializer.Serialize(frequencyGroups10.Values);
+
+            @:const labels10 = @Html.Raw(freqLabels10);
+            @:const counts10 = @Html.Raw(freqCounts10);
+            @:new Chart(document.getElementById('chart10Canvas'), {
+            @:    type: 'bar',
+            @:    data: {
+            @:        labels: labels10,
+            @:        datasets: [{
+            @:            label: 'Количество совпадений частот (10 тиражей)',
+            @:            data: counts10,
+            @:            backgroundColor: 'rgba(255, 99, 132, 0.8)',
+            @:            borderWidth: 1
+            @:        }]
+            @:    },
+            @:    options: {
+            @:        responsive: true,
+            @:        scales: {
+            @:            y: { beginAtZero: true, title: { display: true, text: 'Количество' } },
+            @:            x: { title: { display: true, text: 'Частота (%)' } }
+            @:        }
+            @:    }
+            @:});
+    }
+
+    // ====== 50 ТИРАЖЕЙ ======
+    @if (Model.IntervalTables.ContainsKey(50))
+    {
+            var allValues50 = Model.IntervalTables[50]
+                    .SelectMany(r => r.Positions.Values)
+                    .Select(v =>
+                    {
+                            double val;
+                            return double.TryParse(v?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out val)
+                                    ? Math.Round(val, 2)
+                                    : (double?)null;
+                    })
+                    .Where(v => v.HasValue)
+                    .Select(v => v.Value)
+                    .ToList();
+
+            var frequencyGroups50 = allValues50
+                    .GroupBy(v => v)
+                    .OrderBy(g => g.Key)
+                    .ToDictionary(g => g.Key, g => g.Count());
+
+            var freqLabels50 = System.Text.Json.JsonSerializer.Serialize(
+                    frequencyGroups50.Keys.Select(k => k.ToString("0.##", System.Globalization.CultureInfo.GetCultureInfo("ru-RU")))
+            );
+            var freqCounts50 = System.Text.Json.JsonSerializer.Serialize(frequencyGroups50.Values);
+
+            @:const labels50 = @Html.Raw(freqLabels50);
+            @:const counts50 = @Html.Raw(freqCounts50);
+            @:new Chart(document.getElementById('chart50Canvas'), {
+            @:    type: 'bar',
+            @:    data: {
+            @:        labels: labels50,
+            @:        datasets: [{
+            @:            label: 'Количество совпадений частот (50 тиражей)',
+            @:            data: counts50,
+            @:            backgroundColor: 'rgba(54, 162, 235, 0.8)',
+            @:            borderWidth: 1
+            @:        }]
+            @:    },
+            @:    options: {
+            @:        responsive: true,
+            @:        scales: {
+            @:            y: { beginAtZero: true, title: { display: true, text: 'Количество' } },
+            @:            x: { title: { display: true, text: 'Частота (%)' } }
+            @:        }
+            @:    }
+            @:});
+    }
+
+    // ====== 100 ТИРАЖЕЙ ======
+    @if (Model.IntervalTables.ContainsKey(100))
+    {
+            var allValues100 = Model.IntervalTables[100]
+                    .SelectMany(r => r.Positions.Values)
+                    .Select(v =>
+                    {
+                            double val;
+                            return double.TryParse(v?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out val)
+                                    ? Math.Round(val, 2)
+                                    : (double?)null;
+                    })
+                    .Where(v => v.HasValue)
+                    .Select(v => v.Value)
+                    .ToList();
+
+            var frequencyGroups100 = allValues100
+                    .GroupBy(v => v)
+                    .OrderBy(g => g.Key)
+                    .ToDictionary(g => g.Key, g => g.Count());
+
+            var freqLabels100 = System.Text.Json.JsonSerializer.Serialize(
+                    frequencyGroups100.Keys.Select(k => k.ToString("0.##", System.Globalization.CultureInfo.GetCultureInfo("ru-RU")))
+            );
+            var freqCounts100 = System.Text.Json.JsonSerializer.Serialize(frequencyGroups100.Values);
+
+            @:const labels100 = @Html.Raw(freqLabels100);
+            @:const counts100 = @Html.Raw(freqCounts100);
+            @:new Chart(document.getElementById('chart100Canvas'), {
+            @:    type: 'bar',
+            @:    data: {
+            @:        labels: labels100,
+            @:        datasets: [{
+            @:            label: 'Количество совпадений частот (100 тиражей)',
+            @:            data: counts100,
+            @:            backgroundColor: 'rgba(75, 192, 192, 0.8)',
+            @:            borderWidth: 1
+            @:        }]
+            @:    },
+            @:    options: {
+            @:        responsive: true,
+            @:        scales: {
+            @:            y: { beginAtZero: true, title: { display: true, text: 'Количество' } },
+            @:            x: { title: { display: true, text: 'Частота (%)' } }
+            @:        }
+            @:    }
+            @:});
+    }
+</script>
+<style>
+    .freq-col-1, .freq-col-4 {
+        background-color: #fff;
+    }
+
+    .freq-col-2 {
+        background-color: #fff;
+    }
+
+    .freq-col-3 {
+        background-color: #fff;
+    }
+
+    .freq-col-1[data-value="0"], .freq-col-4[data-value="0"] {
+        background-color: #ff0000;
+    }
+
+    .freq-col-2[data-value="0"] {
+        background-color: #ff0000;
+    }
+
+    .freq-col-3[data-value="0"] {
+        background-color: #ff0000;
+    }
+
+    /* Дополнительные стили для цветов в зависимости от значения */
+    .green-cell {
+        background-color: #28a745;
+    }
+
+    .yellow-cell {
+        background-color: #ffc107;
+    }
+
+    .red-cell {
+        background-color: #dc3545;
+    }
+</style>

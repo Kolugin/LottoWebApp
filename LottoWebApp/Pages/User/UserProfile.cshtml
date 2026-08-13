@@ -1,0 +1,91 @@
+﻿@page
+@model LottoWebApp.Pages.User.UserProfileModel
+@{
+    ViewData["Title"] = "Профиль пользователя";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <form method="post" class="mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h4>Редактировать профиль</h4>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="Input_Login" class="form-label">Логин</label>
+                    <input type="text" asp-for="Input.Login" class="form-control" required />
+                    <span asp-validation-for="Input.Login" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label for="Input_Email" class="form-label">Email</label>
+                    <input type="email" asp-for="Input.Email" class="form-control" required />
+                    <span asp-validation-for="Input.Email" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label for="Input_Phone" class="form-label">Телефон</label>
+                    <input type="tel" asp-for="Input.Phone" class="form-control" />
+                    <span asp-validation-for="Input.Phone" class="text-danger"></span>
+                </div>
+                <button type="submit" asp-page-handler="UpdateProfile" class="btn btn-primary">Сохранить изменения</button>
+            </div>
+        </div>
+    </form>
+
+    <form method="post" class="mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h4>Сменить пароль</h4>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="ChangePasswordInput_OldPassword" class="form-label">Старый пароль</label>
+                    <input type="password" asp-for="ChangePasswordInput.OldPassword" class="form-control" required />
+                    <span asp-validation-for="ChangePasswordInput.OldPassword" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label for="ChangePasswordInput_NewPassword" class="form-label">Новый пароль</label>
+                    <input type="password" asp-for="ChangePasswordInput.NewPassword" class="form-control" required />
+                    <span asp-validation-for="ChangePasswordInput.NewPassword" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label for="ChangePasswordInput_ConfirmNewPassword" class="form-label">Подтвердите новый пароль</label>
+                    <input type="password" asp-for="ChangePasswordInput.ConfirmNewPassword" class="form-control" required />
+                    <span asp-validation-for="ChangePasswordInput.ConfirmNewPassword" class="text-danger"></span>
+                </div>
+                <button type="submit" asp-page-handler="ChangePassword" class="btn btn-warning">Сменить пароль</button>
+            </div>
+        </div>
+    </form>
+
+    <form method="post" onsubmit="return confirm('Вы уверены, что хотите удалить свой аккаунт? Это действие необратимо!');">
+        <div class="card bg-danger text-white">
+            <div class="card-header">
+                <h4>Удалить аккаунт</h4>
+            </div>
+            <div class="card-body">
+                <p>После удаления аккаунта все ваши данные будут потеряны. Это действие нельзя отменить.</p>
+                <button type="submit" asp-page-handler="DeleteAccount" class="btn btn-light text-danger fw-bold">🗑 Удалить мой аккаунт</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <h4>Информация о профиле</h4>
+        </div>
+        <div class="card-body">
+            <ul class="list-unstyled">
+                <li><strong>ID:</strong> @Model.Id</li>
+                <li><strong>Логин:</strong> @Model.Login</li>
+                <li><strong>Email:</strong> @Model.Email</li>
+                <li><strong>Телефон:</strong> @(Model.Phone ?? "Не указан")</li>
+                <li><strong>Активность:</strong> @(Model.Activity ? "Активен" : "Неактивен")</li>
+                <li><strong>Последний вход:</strong> @(Model.LastLogin?.ToString("dd.MM.yyyy HH:mm") ?? "Нет данных")</li>
+            </ul>
+        </div>
+    </div>
+</div>

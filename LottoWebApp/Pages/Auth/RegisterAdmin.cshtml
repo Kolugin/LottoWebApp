@@ -1,0 +1,44 @@
+﻿@page
+@model LottoWebApp.Pages.Auth.RegisterAdminModel
+@{
+    ViewData["Title"] = "Регистрация администратора";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header text-center">
+                    <h3>Регистрация администратора</h3>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        <div class="mb-3">
+                            <label class="form-label">Логин</label>
+                            <input asp-for="Login" class="form-control" required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input asp-for="Email" type="email" class="form-control" required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Телефон</label>
+                            <input asp-for="Phone" class="form-control" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Пароль</label>
+                            <input asp-for="Password" type="password" class="form-control" required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Подтвердите пароль</label>
+                            <input asp-for="ConfirmPassword" type="password" class="form-control" required />
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Зарегистрировать</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

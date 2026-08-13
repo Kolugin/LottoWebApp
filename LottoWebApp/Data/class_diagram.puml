@@ -1,0 +1,24 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam class {
+    BackgroundColor<<External>> #EFEFEF
+    BorderColor<<External>> #Gray
+    FontColor<<External>> #Gray
+}
+class LottoDbContext {
+  +DbSet~User~ Users
+  +DbSet~UserEncryptionKey~ UserEncryptionKeys
+  +DbSet~Admin~ Admins
+  +DbSet~AdminEncryptionKey~ AdminEncryptionKeys
+  +DbSet~Lottery1224BY~ Lottery1224BY
+  +DbSet~Lottery536BY~ Lottery536BY
+  +DbSet~Lottery649BY~ Lottery649BY
+  +DbSet~LotteryBlitzBY~ LotteryBlitzBY
+  +DbSet~LotteryKenoBY~ LotteryKenoBY
+}
+class DbContext <<External>> {
+  (external)
+}
+DbContext <|-- LottoDbContext
+@enduml

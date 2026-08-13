@@ -1,0 +1,121 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A118Model
+@{
+    ViewData["Title"] = "1.18 Вывод частоты и шанса выпадения дополнительного шара по месяцу дню месяца и недели";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <!-- Кнопки экспорта -->
+    <form method="post" asp-page-handler="DownloadCsv" class="d-inline-block">
+        <input type="hidden" name="Game" value="@Model.Game" />
+        <input type="hidden" name="DrawCount" value="@Model.DrawCount" />
+        <input type="hidden" name="Direction" value="@Model.Direction" />
+        <input type="hidden" name="Title" value="@ViewData["Title"]" />
+        <button class="btn btn-success mb-4">💾 Скачать таблицу (CSV)</button>
+    </form>
+
+    <button class="btn btn-info mb-4 ms-2" onclick="downloadChart()">📥 Скачать график (PNG)</button>
+
+    <ul class="nav nav-tabs">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tableTab">📋 Таблица</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab">📊 График</button></li>
+    </ul>
+
+    <div class="tab-content mt-3">
+
+        <!-- Таблица -->
+        <div class="tab-pane fade show active" id="tableTab">
+            <table class="table table-dark table-bordered text-center">
+                <thead>
+                    <tr>
+                        <th>Месяц</th>
+                        <th>День месяца</th>
+                        <th>День недели</th>
+                        <th>Число</th>
+                        <th>Кол-во выпадений</th>
+                        <th>Шанс (%)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in Model.Results)
+                    {
+                        <tr>
+                            <td>@r.Month</td>
+                            <td>@r.DayOfMonth</td>
+                            <td>@r.DayOfWeek</td>
+                            <td>@r.Number</td>
+                            <td>@r.Count</td>
+                            <td>@r.Chance</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- График -->
+        <div class="tab-pane fade" id="chartTab">
+            <canvas id="chartFreq" height="120"></canvas>
+        </div>
+
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+
+<script>
+    // Общий график
+    const allLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                Model.Results.Select(r => r.Month + " - " + r.DayOfMonth + " - " + r.DayOfWeek + " - " + r.Number)
+        ));
+
+    const allValues = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                Model.Results.Select(r => r.Count)
+        ));
+
+    const allColors = allValues.map(() => 'rgba(54, 162, 235, 0.8)');
+
+    let chartRef = new Chart(document.getElementById('chartFreq'), {
+        type: 'bar',
+        data: {
+            labels: allLabels,
+            datasets: [{
+                label: 'Количество выпадений',
+                data: allValues,
+                backgroundColor: allColors,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: { beginAtZero: true }
+            },
+            plugins: {
+                zoom: {
+                    zoom: {
+                        wheel: { enabled: true },   // масштаб колесом
+                        pinch: { enabled: true },   // масштаб на телефоне
+                        mode: 'x'                   // масштабируем по X (горизонтально)
+                    },
+                    pan: {
+                        enabled: true,
+                        mode: 'x'                   // двигаем график по X
+                    }
+                }
+            }
+        }
+    });
+
+    // Скачивание графика
+    function downloadChart() {
+        const a = document.createElement("a");
+        a.href = chartRef.toBase64Image();
+        a.download = "A118_bonus_ball_by_month_day_week.png";
+        a.click();
+    }
+</script>

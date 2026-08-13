@@ -1,0 +1,181 @@
+﻿@page
+@model LottoWebApp.Pages.Admin.DashboardModel
+@using System.Security.Claims
+@{
+    ViewData["Title"] = "Админ-панель";
+}
+
+<style>
+    /* Стиль для подсветки выбранной строки */
+    .table-active-row {
+        background-color: rgba(13, 110, 253, 0.1) !important;
+    }
+    .cursor-pointer { cursor: pointer; }
+</style>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mt-3 mb-3">
+        <h1>Админ-панель</h1>
+        <form method="post" asp-page-handler="Logout">
+            <button type="submit" class="btn btn-danger">Выйти</button>
+        </form>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <nav>
+        <div class="nav nav-tabs" id="nav-tab" role="tablist">
+            <button class="nav-link active" id="nav-users-tab" data-bs-toggle="tab" data-bs-target="#nav-users" type="button" role="tab">Пользователи</button>
+            <button class="nav-link" id="nav-admins-tab" data-bs-toggle="tab" data-bs-target="#nav-admins" type="button" role="tab">Администраторы</button>
+            <button class="nav-link" id="nav-stats-tab" data-bs-toggle="tab" data-bs-target="#nav-stats" type="button" role="tab">Статистика</button>
+        </div>
+    </nav>
+
+    <div class="tab-content" id="nav-tabContent">
+
+        <div class="tab-pane fade show active" id="nav-users" role="tabpanel">
+            <form method="post">
+                <h2 class="mt-3">Управление пользователями</h2>
+                <div class="mb-3 p-2 border rounded bg-light">
+
+                    <button type="submit" asp-page-handler="DeleteUser" class="btn btn-danger me-2"
+                            onclick="return confirm('Вы уверены, что хотите удалить пользователя?')">
+                        Удалить выбранного
+                    </button>
+
+                    <button type="submit" asp-page-handler="UpdateUserEncryptionKey" class="btn btn-warning">
+                        Обновить ключ
+                    </button>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover border">
+                        <thead class="table-dark">
+                            <tr>
+                                <th width="50">Выбор</th>
+                                <th>ID</th>
+                                <th>Логин (расшифрованный)</th>
+                                <th>Дата последнего сеанса</th>
+                                <th>Активность</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var user in Model.Users)
+                            {
+                                <tr class="cursor-pointer" onclick="selectRow(this, 'SelectedUserId')">
+                                    <td class="text-center">
+                                        <input type="radio" name="SelectedUserId" value="@user.Id" class="form-check-input" required />
+                                    </td>
+                                    <td>@user.Id</td>
+                                    <td><strong>@user.Login</strong></td>
+                                    <td>@user.LastLogin?.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                    <td>
+                                        <span class="badge @(user.Activity ? "bg-success" : "bg-secondary")">
+                                            @(user.Activity ? "Active" : "Offline")
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </form>
+        </div>
+
+        <div class="tab-pane fade" id="nav-admins" role="tabpanel">
+            <form method="post">
+                <h2 class="mt-3">Управление администраторами</h2>
+                <div class="mb-3 p-2 border rounded bg-light">
+                    <button type="submit" asp-page-handler="DeleteAdmin" class="btn btn-danger me-2"
+                            onclick="return confirm('Вы уверены, что хотите удалить этого администратора?')">
+                        Удалить выбранного
+                    </button>
+                    <button type="submit" asp-page-handler="UpdateAdminEncryptionKey" class="btn btn-warning me-2">Обновить ключ</button>
+                    <a href="/User/UserProfile" class="btn btn-info">Мой профиль</a>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover border">
+                        <thead class="table-dark">
+                            <tr>
+                                <th width="50">Выбор</th>
+                                <th>ID</th>
+                                <th>Логин</th>
+                                <th>Дата сеанса</th>
+                                <th>Активность</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var admin in Model.Admins)
+                            {
+                                <tr class="cursor-pointer" onclick="selectRow(this, 'SelectedAdminId')">
+                                    <td class="text-center">
+                                        <input type="radio" name="SelectedAdminId" value="@admin.Id" class="form-check-input" required />
+                                    </td>
+                                    <td>@admin.Id</td>
+                                    <td>@admin.Login</td>
+                                    <td>@admin.LastLogin?.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                    <td>@admin.Activity</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </form>
+        </div>
+
+        <div class="tab-pane fade" id="nav-stats" role="tabpanel">
+            <h2 class="mt-3">Состояние системы</h2>
+            <div class="row mt-4">
+                <div class="col-md-4">
+                    <div class="card text-center mb-3">
+                        <div class="card-body">
+                            <h5>ЦП</h5>
+                            <h2 class="text-primary">@Model.Stats.CpuUsage%</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-center mb-3">
+                        <div class="card-body">
+                            <h5>ОЗУ (Занято)</h5>
+                            <h2 class="text-success">@Model.Stats.RamUsed / @Model.Stats.RamTotal ГБ</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-center mb-3">
+                        <div class="card-body">
+                            <h5>Диск C:</h5>
+                            <div class="progress mt-2" style="height: 25px;">
+                                <div class="progress-bar bg-warning" style="width: @Model.Stats.DiskCUsedPercent%">@Model.Stats.DiskCUsedPercent%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function selectRow(row, radioName) {
+        const radio = row.querySelector(`input[name="${radioName}"]`);
+        if (radio) {
+            radio.checked = true;
+
+            // Снимаем класс со всех строк в этой таблице
+            const tbody = row.closest('tbody');
+            tbody.querySelectorAll('tr').forEach(tr => tr.classList.remove('table-active-row'));
+
+            // Добавляем класс текущей строке
+            row.classList.add('table-active-row');
+        }
+    }
+</script>

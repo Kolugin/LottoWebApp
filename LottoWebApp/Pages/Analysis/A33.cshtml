@@ -1,0 +1,69 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A33Model
+@{
+    ViewData["Title"] = "3.3 Карта выпадения комбинаций чисел";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <form method="post" class="mb-4">
+        <input type="hidden" name="Game" value="@Model.Game" />
+        <div class="row">
+            <div class="col-md-3">
+                <label for="DrawCount" class="form-label">Количество тиражей (0 - все)</label>
+                <input type="number" name="DrawCount" id="DrawCount" class="form-control" min="0" value="@(Model.DrawCount > 0 ? Model.DrawCount : 0)" />
+            </div>
+            <div class="col-md-3">
+                <label for="Direction" class="form-label">Направление</label>
+                <select name="Direction" id="Direction" class="form-select">
+                    <option value="newToOld" selected="@(Model.Direction == "newToOld")">Сначала новые</option>
+                    <option value="oldToNew" selected="@(Model.Direction == "oldToNew")">Сначала старые</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="CombinationSize" class="form-label">Количество чисел в комбинации</label>
+                <select name="CombinationSize" id="CombinationSize" class="form-select">
+                    @for (int i = 2; i <= Model.MaxCombinationSize; i++)
+                    {
+                        <option value="@i" selected="@(Model.CombinationSize == i)">@(i) @(i == 2 ? "числа" : (i >= 4 ? "чисел" : "числа"))</option>
+                    }
+                </select>
+            </div>
+            @if (Model.Game?.ToLower() == "blitz")
+            {
+                <div class="col-md-3">
+                    <label for="IncludeBonus" class="form-label">Включить бонус</label>
+                    <select name="IncludeBonus" id="IncludeBonus" class="form-select">
+                        <option value="false" selected="@(Model.IncludeBonus == false)">Нет</option>
+                        <option value="true" selected="@(Model.IncludeBonus == true)">Да</option>
+                    </select>
+                </div>
+            }
+            <div class="col-md-12 mt-2">
+                <button type="submit" class="btn btn-primary">Построить карту комбинаций</button>
+            </div>
+        </div>
+    </form>
+
+    @if (Model.GeneratedFiles.Any())
+    {
+        <div class="alert alert-info">
+            Нажмите на кнопку с файлом для загрузки
+        </div>
+
+        <div class="mb-4">
+            <h4>Созданные файлы:</h4>
+            <div class="row">
+                @foreach (var file in Model.GeneratedFiles)
+                {
+                    <div class="col-md-4 mb-2">
+                        <a href="/@file.RelativePath" class="btn btn-outline-primary w-100" download>📥 @file.FileName</a>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>

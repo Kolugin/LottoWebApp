@@ -1,0 +1,251 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A320Model
+@using System.Text.Json;
+@{
+    ViewData["Title"] = "3.20 Карта распределения пауз";
+    var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <form method="post" class="mb-4">
+        <input type="hidden" name="Game" value="@Model.Game" />
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label for="DrawCount" class="form-label">Количество тиражей (0 - все)</label>
+                <input type="number" name="DrawCount" id="DrawCount" class="form-control" min="0" value="@(Model.DrawCount > 0 ? Model.DrawCount : 0)" />
+            </div>
+            <div class="col-md-4">
+                <label for="Direction" class="form-label">Направление</label>
+                <select name="Direction" id="Direction" class="form-select">
+                    <option value="newToOld" selected="@(Model.Direction == "newToOld")">Сначала новые</option>
+                    <option value="oldToNew" selected="@(Model.Direction == "oldToNew")">Сначала старые</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-primary w-100">Построить карту распределения пауз</button>
+                @if (Model.PauseDistributionResults.Any())
+                {
+                    <button type="submit" asp-page-handler="DownloadCsv" class="btn btn-success w-100 mt-2">💾 Скачать CSV</button>
+                }
+            </div>
+        </div>
+    </form>
+
+    @if (Model.PauseDistributionResults.Any())
+    {
+        // ВАЖНО: Ваша логика с заменой запятой на точку здесь сохранена!
+        var groupedResults = Model.PauseDistributionResults
+        .GroupBy(r => r.Ball)
+        .Select(g => new
+        {
+            Ball = g.Key,
+            Results = g.Select(r => new
+            {
+                r.PauseCount,
+                r.Occurrences,
+                // Преобразуем шанс в float (точка, а не запятая)
+                Chance = double.TryParse(r.Chance.ToString().Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double val) ? val : 0.0
+            }).ToList(),
+            SortKey = g.Key.StartsWith("№")
+        ? int.Parse(g.Key.TrimStart('№'))
+        : (g.Key.StartsWith("Бонус")
+        ? 1000 + int.Parse(g.Key.Replace("Бонус ", ""))
+        : 9999)
+        })
+        .OrderBy(g => g.SortKey);
+
+        <ul class="nav nav-tabs">
+            <li class="nav-item">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tableTab">📋 Таблица</button>
+            </li>
+            @foreach (var group in groupedResults)
+            {
+                var targetId = $"chartTab{group.Ball.Replace(" ", "").Replace("-", "")}";
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#@targetId">📊 Шар @group.Ball</button>
+                </li>
+            }
+        </ul>
+
+        <div class="tab-content mt-3">
+            <div class="tab-pane fade show active" id="tableTab">
+                <div class="table-responsive">
+                    <table class="table table-dark table-bordered text-center">
+                        <thead>
+                            <tr>
+                                <th>Шар</th>
+                                <th>Количество пауз</th>
+                                <th>Кол-во выпадений</th>
+                                <th>Шанс (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var result in Model.PauseDistributionResults)
+                            {
+                                <tr>
+                                    <td>@result.Ball</td>
+                                    <td>@result.PauseCount</td>
+                                    <td>@result.Occurrences</td>
+                                    <td>@result.Chance</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            @foreach (var group in groupedResults)
+            {
+                var targetId = $"chartTab{group.Ball.Replace(" ", "").Replace("-", "")}";
+                var canvasId = $"chart{group.Ball.Replace(" ", "").Replace("-", "")}";
+
+                <div class="tab-pane fade" id="@targetId"
+                                data-ball-data="@(JsonSerializer.Serialize(group.Results, jsonOptions))">
+                    <h4>График распределения для шара @group.Ball</h4>
+                    <div style="height: 500px;">
+                        <canvas id="@canvasId"></canvas>
+                    </div>
+                    <button class="btn btn-info mt-3" onclick="downloadChart('@canvasId', 'A320_@group.Ball.Replace(" ", "_")_distribution.png')">📥 Скачать (PNG)</button>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // 1. КОНТЕЙНЕР ДЛЯ ХРАНЕНИЯ ЭКЗЕМПЛЯРОВ ГРАФИКОВ
+    const chartInstances = {};
+
+    // Вспомогательная функция для декодирования HTML-сущностей
+    function htmlDecode(input) {
+      const doc = new DOMParser().parseFromString(input, "text/html");
+      return doc.documentElement.textContent;
+    }
+
+    function createOrUpdateChart(tabPaneElement) {
+        const canvasId = tabPaneElement.querySelector('canvas').id;
+        const ctx = document.getElementById(canvasId)?.getContext('2d');
+        if (!ctx) return;
+
+        // Получаем и декодируем данные
+        const rawDataHtmlEncoded = tabPaneElement.getAttribute('data-ball-data');
+        const rawDataJson = htmlDecode(rawDataHtmlEncoded);
+
+        if (!rawDataJson) {
+            console.error("Нет данных для графика: data-ball-data пуст.");
+            return;
+        }
+
+        try {
+            const rawData = JSON.parse(rawDataJson);
+            const sortedData = [...rawData].sort((a, b) => a.pauseCount - b.pauseCount);
+            const labels = sortedData.map(r => r.pauseCount);
+            const occurrences = sortedData.map(r => r.occurrences);
+            const chances = sortedData.map(r => r.chance);
+
+            if (chartInstances[canvasId]) {
+                // ... (Код обновления графика остается прежним)
+                const chart = chartInstances[canvasId];
+                chart.data.labels = labels;
+                chart.data.datasets[0].data = occurrences;
+                chart.data.datasets[1].data = chances;
+                chart.update();
+            } else {
+                let ballName = tabPaneElement.querySelector('h4').textContent.trim().replace('График распределения для шара', '').trim();
+
+                // 🚀 НОВОЕ РАСПОЛОЖЕНИЕ ОСЕЙ: y1 (Выпадения) теперь слева, y (Шанс) — справа
+                chartInstances[canvasId] = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Кол-во выпадений',
+                            data: occurrences,
+                            backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                            yAxisID: 'y1' // 🌟 y1: Выпадения (теперь левая)
+                        }, {
+                            label: 'Шанс (%)',
+                            data: chances,
+                            backgroundColor: 'rgba(54, 162, 235, 0.8)',
+                            yAxisID: 'y', // 🌟 y: Шанс (теперь правая)
+                            type: 'line',
+                            pointRadius: 3,
+                            fill: false
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            // 1. ЛЕВАЯ ОСЬ (y1: Кол-во выпадений)
+                            y1: {
+                                beginAtZero: true,
+                                position: 'left',
+                                title: { display: true, text: 'Кол-во выпадений' } // 🌟 Название
+                            },
+                            // 2. ПРАВАЯ ОСЬ (y: Шанс)
+                            y: {
+                                beginAtZero: true,
+                                position: 'right',
+                                title: { display: true, text: 'Шанс (%)' }, // 🌟 Название
+                                grid: { drawOnChartArea: false } // Убираем сетку для правой оси
+                            },
+                            x: { title: { display: true, text: `Количество пауз для шара ${ballName}` } }
+                        },
+                        plugins: { tooltip: { mode: 'index', intersect: false } }
+                    }
+                });
+            }
+        } catch (e) {
+            console.error(`Ошибка при разборе JSON для ${canvasId}:`, e);
+            console.error("Неудачная строка JSON:", rawDataJson);
+        }
+    }
+
+    // 2. ОБРАБОТЧИК ДЛЯ АКТИВАЦИИ ВКЛАДКИ
+    document.addEventListener("DOMContentLoaded", function() {
+        const tabElms = document.querySelectorAll('.nav-link[data-bs-toggle="tab"]');
+
+        tabElms.forEach(button => {
+            const targetSelector = button.getAttribute('data-bs-target');
+            const targetPane = document.querySelector(targetSelector);
+
+            if (targetPane && targetSelector !== '#tableTab') {
+
+                button.addEventListener('shown.bs.tab', function(e) {
+                    setTimeout(() => {
+                        createOrUpdateChart(targetPane);
+                    }, 0);
+                });
+
+                if (targetPane.classList.contains('active')) {
+                     setTimeout(() => {
+                        createOrUpdateChart(targetPane);
+                    }, 100);
+                }
+            }
+        });
+
+        // 4. Функция скачивания
+        window.downloadChart = function(chartId, filename) {
+            const chart = chartInstances[chartId];
+            if (chart)
+            {
+                const link = document.createElement('a');
+                link.href = chart.toBase64Image({ backgroundColor: 'white' });
+                link.download = filename;
+                link.click();
+            }
+            else
+            {
+                alert("График еще не создан. Пожалуйста, откройте нужную вкладку с графиком.");
+            }
+        };
+    });
+</script>

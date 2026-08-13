@@ -1,0 +1,190 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A16Model
+@{
+    ViewData["Title"] = "1.6 Вывод 10 частых и редких чисел по месяцам";
+    bool is320 = Model.Game == "320";
+    var fields = is320 ? new[] { "B1", "B2" } : new[] { "B" };
+}
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-3">⬅ Назад в меню</a>
+
+    <form method="post" asp-page-handler="DownloadCsv" class="d-inline-block ms-2">
+        <input type="hidden" name="Game" value="@Model.Game" />
+        <input type="hidden" name="DrawCount" value="@Model.DrawCount" />
+        <input type="hidden" name="Direction" value="@Model.Direction" />
+        <input type="hidden" name="Title" value="@ViewData["Title"]" />
+        <input type="hidden" name="SelectedTable" id="selectedTableInput" value="" />
+        <button class="btn btn-success mb-3">💾 Скачать таблицу (CSV)</button>
+    </form>
+
+    <ul class="nav nav-tabs" id="analysisTabs">
+        @foreach (var field in fields)
+        {
+            var fieldResults = is320 ? Model.ResultsByField[field] : Model.Results;
+            var distinctMonths = fieldResults.Select(r => r.Month).Distinct().ToList();
+
+            <li class="nav-item">
+                <button class="nav-link @(field == fields[0] ? "active" : "")" data-bs-toggle="tab" data-bs-target="#tableTab_@field">
+                    📋 Таблица @(is320 ? field : "")
+                </button>
+            </li>
+
+            @foreach (var month in distinctMonths)
+            {
+                var monthId = "m_" + month.Replace(" ", "_").Replace("/", "_") + (is320 ? "_" + field : "");
+                <li class="nav-item">
+                    <button class="nav-link"
+                            data-bs-toggle="tab"
+                            data-bs-target="#tab_@monthId"
+                            data-month="@month"
+                            data-field="@field">
+                        📊 @month @(is320 ? "(" + field + ")" : "")
+                    </button>
+                </li>
+            }
+        }
+    </ul>
+
+    <div class="tab-content mt-3">
+        @foreach (var field in fields)
+        {
+            var fieldResults = is320 ? Model.ResultsByField[field] : Model.Results;
+
+            <div class="tab-pane fade @(field == fields[0] ? "show active" : "")" id="tableTab_@field">
+                <table class="table table-dark table-bordered text-center">
+                    <thead>
+                        <tr>
+                            <th>Месяц</th>
+                            <th>№ Шара</th>
+                            <th>Кол-во</th>
+                            <th>Шанс (%)</th>
+                            <th>Тип</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in fieldResults)
+                        {
+                            <tr>
+                                <td>@r.Month</td>
+                                <td>@r.Number</td>
+                                <td>@r.Count</td>
+                                <td>@r.Chance</td>
+                                <td>@r.Type</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            var distinctMonths = fieldResults.Select(r => r.Month).Distinct().ToList();
+            foreach (var month in distinctMonths)
+            {
+                var monthId = "m_" + month.Replace(" ", "_").Replace("/", "_") + (is320 ? "_" + field : "");
+                <div class="tab-pane fade" id="tab_@monthId">
+                    <div class="mb-2">
+                        <button class="btn btn-info btn-sm" onclick="downloadChart('@monthId')">
+                            📥 Скачать график (@month @(is320 ? "(" + field + ")" : ""))
+                        </button>
+                    </div>
+                    <div style="height:600px">
+                        <canvas id="chart_@monthId"></canvas>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<script>
+    window.monthChartsData = {
+        @foreach (var field in fields)
+        {
+            var fieldResults = is320 ? Model.ResultsByField[field] : Model.Results;
+            @:@Html.Raw(System.Text.Json.JsonSerializer.Serialize(field)): @Html.Raw(
+                System.Text.Json.JsonSerializer.Serialize(
+                    fieldResults
+                        .GroupBy(r => r.Month)
+                        .ToDictionary(
+                            g => g.Key,
+                            g => new {
+                                labels = g.Select(x => x.Number).ToList(),
+                                values = g.Select(x => x.Count).ToList(),
+                                types  = g.Select(x => x.Type).ToList()
+                            }
+                        )
+                )
+            ),
+        }
+    };
+
+    const charts = {};
+    const is320 = @is320.ToString().ToLower();
+
+    document.addEventListener('shown.bs.tab', function (e) {
+        const month = e.target.dataset.month;
+        const field = e.target.dataset.field;
+        if (!month || !field) return;
+
+        const monthId = 'm_' + month.replace(/\s|\/+/g, '_') + (is320 ? '_' + field : '');
+        if (charts[monthId]) {
+            charts[monthId].resize();
+            return;
+        }
+
+        const canvas = document.getElementById('chart_' + monthId);
+        if (!canvas) return;
+
+        const data = window.monthChartsData[field] && window.monthChartsData[field][month];
+        if (!data) return;
+
+        const colors = data.types.map(t =>
+            t === "Частое" ? 'rgba(255,99,132,0.8)' : 'rgba(54,162,235,0.7)'
+        );
+
+        charts[monthId] = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Количество выпадений',
+                    data: data.values,
+                    backgroundColor: colors,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+    });
+
+    document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(btn => {
+        btn.addEventListener("shown.bs.tab", e => {
+            const target = e.target.getAttribute("data-bs-target");
+            if (target && target.startsWith("#tableTab_")) {
+                const field = target.substring(10);
+                document.getElementById("selectedTableInput").value = is320 ? field : "";
+            }
+        });
+    });
+
+    function downloadChart(monthId) {
+        const chart = charts[monthId];
+        if (!chart) {
+            alert("Сначала открой вкладку с этим графиком.");
+            return;
+        }
+        const a = document.createElement("a");
+        a.href = chart.toBase64Image();
+        a.download = "Frequency_" + monthId + ".png";
+        a.click();
+    }
+</script>

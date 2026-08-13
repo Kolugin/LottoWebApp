@@ -1,0 +1,33 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam class {
+    BackgroundColor<<External>> #EFEFEF
+    BorderColor<<External>> #Gray
+    FontColor<<External>> #Gray
+}
+class ErrorModel {
+  +string? RequestId
+  +bool ShowRequestId
+  +OnGet()
+}
+class PageModel <<External>> {
+  (external)
+}
+PageModel <|-- ErrorModel
+class IndexModel {
+  +Dictionary~string, List~LotteryDrawItem~~ LotteryData
+  +OnGetAsync()
+}
+PageModel <|-- IndexModel
+class LotteryDrawItem {
+  +int Draw
+  +string Date
+  +string? Time
+  +string Numbers
+}
+class PrivacyModel {
+  +OnGet()
+}
+PageModel <|-- PrivacyModel
+@enduml

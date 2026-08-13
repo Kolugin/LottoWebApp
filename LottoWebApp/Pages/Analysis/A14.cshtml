@@ -1,0 +1,277 @@
+﻿@page
+@model LottoWebApp.Pages.Analysis.A14Model
+@{
+    ViewData["Title"] = "1.4 Вывод 10 частых и редких чисел";
+}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="container mt-4">
+    <h2 class="mb-4">@ViewData["Title"]</h2>
+
+    <a href="/User/UserMainMenu" class="btn btn-secondary mb-4">⬅ Назад в меню</a>
+
+    <!-- Кнопки экспорта -->
+    <form id="csvForm" method="post" asp-page-handler="DownloadCsv" class="d-inline-block">
+        <input type="hidden" name="Game" value="@Model.Game" />
+        <input type="hidden" name="DrawCount" value="@Model.DrawCount" />
+        <input type="hidden" name="Direction" value="@Model.Direction" />
+        <input type="hidden" name="Title" value="@ViewData["Title"]" />
+        <input type="hidden" name="SelectedTable" id="selectedTableInput" value="" />
+        <button class="btn btn-success mb-4">💾 Скачать таблицу (CSV)</button>
+    </form>
+
+    <button class="btn btn-info mb-4 ms-2" onclick="downloadChart()">📥 Скачать график (PNG)</button>
+
+    @if (Model.Game == "320")
+    {
+        <ul class="nav nav-tabs">
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tableTabB1">📋 Таблица B1</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTabB1">📊 График B1</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tableTabB2">📋 Таблица B2</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTabB2">📊 График B2</button></li>
+        </ul>
+
+        <div class="tab-content mt-3">
+
+            <!-- Таблица B1 -->
+            <div class="tab-pane fade show active" id="tableTabB1">
+                <table class="table table-dark table-bordered text-center">
+                    <thead>
+                        <tr>
+                            <th>Число</th>
+                            <th>Количество выпадений</th>
+                            <th>Вероятность (%)</th>
+                            <th>Тип</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in Model.ResultsB1)
+                        {
+                            <tr>
+                                <td>@r.Number</td>
+                                <td>@r.Count</td>
+                                <td>@r.Chance</td>
+                                <td>@r.Type</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- График B1 -->
+            <div class="tab-pane fade" id="chartTabB1">
+                <canvas id="chartFreqB1" height="120"></canvas>
+            </div>
+
+            <!-- Таблица B2 -->
+            <div class="tab-pane fade" id="tableTabB2">
+                <table class="table table-dark table-bordered text-center">
+                    <thead>
+                        <tr>
+                            <th>Число</th>
+                            <th>Количество выпадений</th>
+                            <th>Вероятность (%)</th>
+                            <th>Тип</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in Model.ResultsB2)
+                        {
+                            <tr>
+                                <td>@r.Number</td>
+                                <td>@r.Count</td>
+                                <td>@r.Chance</td>
+                                <td>@r.Type</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- График B2 -->
+            <div class="tab-pane fade" id="chartTabB2">
+                <canvas id="chartFreqB2" height="120"></canvas>
+            </div>
+
+        </div>
+    }
+    else
+    {
+        <ul class="nav nav-tabs">
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tableTab">📋 Таблица</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#chartTab">📊 График</button></li>
+        </ul>
+
+        <div class="tab-content mt-3">
+
+            <!-- Таблица -->
+            <div class="tab-pane fade show active" id="tableTab">
+                <table class="table table-dark table-bordered text-center">
+                    <thead>
+                        <tr>
+                            <th>Число</th>
+                            <th>Количество выпадений</th>
+                            <th>Вероятность (%)</th>
+                            <th>Тип</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in Model.Results)
+                        {
+                            <tr>
+                                <td>@r.Number</td>
+                                <td>@r.Count</td>
+                                <td>@r.Chance</td>
+                                <td>@r.Type</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- График -->
+            <div class="tab-pane fade" id="chartTab">
+                <canvas id="chartFreq" height="120"></canvas>
+            </div>
+
+        </div>
+    }
+</div>
+
+<script>
+    const is320 = "@Model.Game" === "320";
+
+    // Хранилище графиков
+    const charts = {};
+
+    // --- Для 320 ---
+    if (is320) {
+        // Данные для B1
+        const labelsB1 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ResultsB1.Select(r => r.Number)));
+        const valuesB1 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ResultsB1.Select(r => r.Count)));
+        const typesB1 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ResultsB1.Select(r => r.Type)));
+        const colorsB1 = typesB1.map(t => t === "Частое" ? 'rgba(255, 99, 132, 0.8)' : 'rgba(54,162,235,0.7)');
+
+        // Данные для B2
+        const labelsB2 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ResultsB2.Select(r => r.Number)));
+        const valuesB2 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ResultsB2.Select(r => r.Count)));
+        const typesB2 = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ResultsB2.Select(r => r.Type)));
+        const colorsB2 = typesB2.map(t => t === "Частое" ? 'rgba(255, 99, 132, 0.8)' : 'rgba(54,162,235,0.7)');
+
+        // Создаём графики
+        charts.chartFreqB1 = new Chart(document.getElementById('chartFreqB1'), {
+            type: 'bar',
+            data: {
+                labels: labelsB1,
+                datasets: [{
+                    label: 'Количество выпадений',
+                    data: valuesB1,
+                    backgroundColor: colorsB1,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+
+        charts.chartFreqB2 = new Chart(document.getElementById('chartFreqB2'), {
+            type: 'bar',
+            data: {
+                labels: labelsB2,
+                datasets: [{
+                    label: 'Количество выпадений',
+                    data: valuesB2,
+                    backgroundColor: colorsB2,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+    }
+    // --- Для остальных игр ---
+    else {
+        const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Results.Select(r => r.Number)));
+        const values = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Results.Select(r => r.Count)));
+        const types = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Results.Select(r => r.Type)));
+
+        // Цвет: Частое → Красный, Редкое → Синий
+        const colors = types.map(t => t === "Частое" ? 'rgba(255, 99, 132, 0.8)' : 'rgba(54,162,235,0.7)');
+
+        charts.chartFreq = new Chart(document.getElementById('chartFreq'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Количество выпадений',
+                    data: values,
+                    backgroundColor: colors,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+    }
+
+    // --- НОВОЕ: Отслеживание активного canvas'а ---
+    let activeCanvasId = null;
+
+    document.addEventListener("DOMContentLoaded", () => {
+        // Обновляем значение SelectedTable при переключении вкладок
+        document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(btn => {
+            btn.addEventListener("shown.bs.tab", e => {
+                const target = e.target.getAttribute("data-bs-target");
+                if (target === "#tableTabB1") {
+                    document.getElementById("selectedTableInput").value = "B1";
+                } else if (target === "#tableTabB2") {
+                    document.getElementById("selectedTableInput").value = "B2";
+                }
+
+                // --- УСТАНАВЛИВАЕМ activeCanvasId при переключении вкладки ---
+                if (target === "#chartTabB1") {
+                    activeCanvasId = "chartFreqB1";
+                } else if (target === "#chartTabB2") {
+                    activeCanvasId = "chartFreqB2";
+                } else if (target === "#chartTab") {
+                    activeCanvasId = "chartFreq";
+                }
+            });
+        });
+
+        // Для остальных игр оставляем пустым
+        if (!is320) {
+            document.getElementById("selectedTableInput").value = "";
+            // Если вкладка графика активна сразу, установим ID
+            if (document.querySelector('button[data-bs-target="#chartTab"]').classList.contains('active')) {
+                activeCanvasId = "chartFreq";
+            }
+        } else {
+            // Если вкладка B1 или B2 активна, установим ID
+            if (document.querySelector('button[data-bs-target="#chartTabB1"]').classList.contains('active')) {
+                activeCanvasId = "chartFreqB1";
+            } else if (document.querySelector('button[data-bs-target="#chartTabB2"]').classList.contains('active')) {
+                activeCanvasId = "chartFreqB2";
+            }
+        }
+    });
+
+    function downloadChart() {
+        if (!activeCanvasId || !charts[activeCanvasId]) {
+            alert('График не инициализирован. Открой вкладку с графиком и повтори скачивание.');
+            return;
+        }
+
+        const a = document.createElement("a");
+        a.href = charts[activeCanvasId].toBase64Image();
+        a.download = activeCanvasId + ".png";
+        a.click();
+    }
+</script>

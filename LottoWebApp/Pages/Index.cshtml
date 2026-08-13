@@ -1,0 +1,197 @@
+﻿@page
+@model LottoWebApp.Pages.IndexModel
+@{
+    ViewData["Title"] = "Главная страница";
+}
+
+<style>
+    .numbers-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, 30px);
+        gap: 4px;
+        justify-content: center;
+    }
+
+        .numbers-container.keno {
+            grid-template-columns: repeat(10, 30px);
+        }
+
+        .numbers-container.blitz {
+            grid-template-columns: repeat(4, 30px);
+        }
+
+        .numbers-container.f649by {
+            grid-template-columns: repeat(6, 30px);
+        }
+
+        .numbers-container.f536by {
+            grid-template-columns: repeat(6, 30px);
+        }
+
+        .numbers-container.f1224by {
+            grid-template-columns: repeat(6, 30px);
+        }
+
+        .numbers-container.f320by {
+            grid-template-columns: repeat(6, 30px);
+        }
+
+    .number-circle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border: 1px solid #ccc;
+        border-radius: 50%;
+        font-size: 0.9em;
+        background-color: #f8f9fa;
+    }
+
+    .analysis-section {
+        margin-top: 60px;
+    }
+
+    .analysis-item {
+        margin-bottom: 20px;
+        padding: 15px;
+        border-radius: 10px;
+        background: #f5f5f5;
+        transition: background-color 0.2s ease;
+    }
+
+        .analysis-item:hover {
+            background-color: #e9ecef;
+        }
+
+        .analysis-item h5 {
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+    .auth-buttons {
+        margin-top: 30px;
+        margin-bottom: 40px;
+    }
+</style>
+
+<div class="container mt-5">
+    <div class="text-center mb-4">
+        <h1 class="display-4">Добро пожаловать</h1>
+        <p>Анализ лотерейных тиражей в режиме онлайн</p>
+
+        <!-- Верхние кнопки входа и регистрации -->
+        <div class="auth-buttons">
+            <a class="btn btn-primary btn-lg me-2" href="/Auth/Login" role="button">Вход</a>
+            <a class="btn btn-outline-secondary btn-lg" href="/Auth/Register" role="button">Регистрация</a>
+        </div>
+    </div>
+
+    @if (Model.LotteryData.Any())
+    {
+        @foreach (var lotteryGroup in Model.LotteryData)
+        {
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <h3>@lotteryGroup.Key</h3>
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Тираж</th>
+                                <th>Дата</th>
+                                @if (lotteryGroup.Key == "12/24" || lotteryGroup.Key == "Блиц" || lotteryGroup.Key == "3+3")
+                                {
+                                    <th>Время</th>
+                                }
+                                <th>Числа</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var draw in lotteryGroup.Value)
+                            {
+                                <tr>
+                                    <td>@draw.Draw</td>
+                                    <td>@draw.Date</td>
+                                    @if (lotteryGroup.Key == "12/24" || lotteryGroup.Key == "Блиц" || lotteryGroup.Key == "3+3")
+                                    {
+                                        <td>@draw.Time</td>
+                                    }
+                                    <td>
+                                        @{
+                                            string cssClass = lotteryGroup.Key.ToLower() switch
+                                            {
+                                                "kenoby" => "numbers-container keno",
+                                                "blitzby" => "numbers-container blitz",
+                                                "649by" => "numbers-container f649by",
+                                                "536by" => "numbers-container f536by",
+                                                "1224by" => "numbers-container f1224by",
+                                                "320by" => "numbers-container f320by",
+                                                _ => "numbers-container"
+                                            };
+                                        }
+                                        <div class="@cssClass">
+                                            @foreach (var num in draw.Numbers.Split(", ").Where(n => !string.IsNullOrEmpty(n)))
+                                            {
+                                                <div class="number-circle">@num</div>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-md-12 text-center">
+                <p>Данные о тиражах отсутствуют.</p>
+            </div>
+        </div>
+    }
+
+    <div class="analysis-section">
+        <h2 class="text-center mb-4">Доступные анализы</h2>
+
+        <div class="analysis-item">
+            <h5>1. Общие характеристики</h5>
+            <p>Включает анализ всех тиражей, их сортировку, расчёт характеристик, частоту и шансы выпадения чисел и бонусных шаров по различным временным параметрам (день, месяц, год).</p>
+        </div>
+
+        <div class="analysis-item">
+            <h5>2. Частотный анализ</h5>
+            <p>Показывает общие частоты выпадения чисел, топ-10, топ-50 и топ-100 наиболее частых и редких чисел. Также содержит карту пауз между выпадениями.</p>
+        </div>
+
+        <div class="analysis-item">
+            <h5>3. Табличные карты</h5>
+            <p>Позволяет визуализировать выпадения чисел в виде карт распределений: по позициям, комбинациям, чётности, простым и составным числам, суммам и медианам, паузам и переходам.</p>
+        </div>
+
+        <div class="analysis-item">
+            <h5>4. Досье</h5>
+            <p>Создание индивидуального досье для каждого числа и комбинации, включая частоту, интервалы выпадений и позиционное распределение.</p>
+        </div>
+
+        <div class="analysis-item">
+            <h5>5. Таблицы</h5>
+            <p>Включает таблицы переходов чисел и их интервалов, связи между позициями и анализ закономерностей по позиционным данным.</p>
+        </div>
+
+        <div class="analysis-item">
+            <h5>6. Поиск фигур</h5>
+            <p>Интеллектуальный поиск геометрических паттернов — горизонтальных, вертикальных и диагональных линий, а также пользовательских фигур для анализа последовательностей выпадений.</p>
+        </div>
+    </div>
+
+    <!-- Нижние кнопки входа и регистрации -->
+    <div class="row auth-buttons text-center">
+        <div class="col-md-12">
+            <a class="btn btn-primary btn-lg me-2" href="/Auth/Login" role="button">Вход</a>
+            <a class="btn btn-outline-secondary btn-lg" href="/Auth/Register" role="button">Регистрация</a>
+        </div>
+    </div>
+</div>
