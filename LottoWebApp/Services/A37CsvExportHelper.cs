@@ -1,11 +1,10 @@
-﻿using DocumentFormat.OpenXml.Wordprocessing;
-using LottoWebApp.Data;
+﻿using LottoWebApp.Data;
 using LottoWebApp.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
 using System.Globalization;
-using System.Text;
+using System.IO.Compression;
 
 namespace LottoWebApp.Services
 {
@@ -46,8 +45,10 @@ namespace LottoWebApp.Services
             if (!numberProps.Any())
                 throw new InvalidOperationException("Не найдены столбцы чисел.");
 
-            // Определяем количество шаров для игры
-            int numberOfBalls = game?.ToLower() switch
+            bool is320 = game.Equals("320", StringComparison.OrdinalIgnoreCase);
+            var propNames320 = new[] { "B11", "B12", "B13", "B21", "B22", "B23" };
+
+            int numberOfBalls = is320 ? 6 : game?.ToLower() switch
             {
                 "keno" => 20,
                 "blitz" => 8,
@@ -57,8 +58,12 @@ namespace LottoWebApp.Services
                 _ => 20
             };
 
-            // Интервалы для анализа (10, 50 и 100 тиражей)
             var intervals = new List<int> { 10, 50, 100 };
+            var createdFiles = new List<string>();
+
+            string titlePart = string.IsNullOrEmpty(title) ? "A37_Frequency_Distribution_Map" : title;
+            string gameStr = game ?? "unknown";
+            string drawCountStr = drawCount?.ToString() ?? "all";
 
             foreach (int interval in intervals)
             {
@@ -77,46 +82,72 @@ namespace LottoWebApp.Services
                     var row = dt.NewRow();
                     row["№ Тиражей"] = $"{startIndex + 1}_{startIndex + interval}";
 
-                    // Подсчет выпадений для каждого шара в текущем окне
                     for (int i = startIndex; i < startIndex + interval; i++)
                     {
                         var currentRow = draws[i];
-                        for (int colIndex = 0; colIndex < numberProps.Count; colIndex++)
+
+                        if (is320)
                         {
-                            var prop = numberProps[colIndex];
-                            var val = prop.GetValue(currentRow);
-                            if (val != null && int.TryParse(val.ToString(), out int ball) && ball != 0)
+                            foreach (var propName in propNames320)
                             {
-                                if (!ballCounts.ContainsKey(ball))
-                                    ballCounts[ball] = 0;
-                                ballCounts[ball]++;
+                                var prop = first.GetType().GetProperty(propName);
+                                if (prop != null)
+                                {
+                                    var val = prop.GetValue(currentRow);
+                                    if (val != null && int.TryParse(val.ToString(), out int ball) && ball != 0)
+                                    {
+                                        if (!ballCounts.ContainsKey(ball))
+                                            ballCounts[ball] = 0;
+                                        ballCounts[ball]++;
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            foreach (var prop in numberProps)
+                            {
+                                if (prop.Name == "BB") continue;
+                                var val = prop.GetValue(currentRow);
+                                if (val != null && int.TryParse(val.ToString(), out int ball) && ball != 0)
+                                {
+                                    if (!ballCounts.ContainsKey(ball))
+                                        ballCounts[ball] = 0;
+                                    ballCounts[ball]++;
+                                }
                             }
                         }
                     }
 
-                    // Запись вероятностей для каждого шара в текущем интервале
+                    var startRow = draws[startIndex];
                     for (int position = 1; position <= numberOfBalls; position++)
                     {
-                        if (startIndex + position - 1 < draws.Count)
+                        int ball = 0;
+                        if (is320)
                         {
-                            var currentDraw = draws[startIndex + position - 1];
+                            var prop = first.GetType().GetProperty(propNames320[position - 1]);
+                            if (prop != null)
+                            {
+                                var val = prop.GetValue(startRow);
+                                if (val != null && int.TryParse(val.ToString(), out int num))
+                                    ball = num;
+                            }
+                        }
+                        else
+                        {
                             var positionProp = numberProps.FirstOrDefault(p => p.Name == $"B{position}");
                             if (positionProp != null)
                             {
-                                var val = positionProp.GetValue(currentDraw);
-                                if (val != null && int.TryParse(val.ToString(), out int ball))
-                                {
-                                    if (ballCounts.ContainsKey(ball))
-                                    {
-                                        double probability = (double)interval / ballCounts[ball];
-                                        row[$"№Поз {position}"] = probability.ToString("F8");
-                                    }
-                                    else
-                                    {
-                                        row[$"№Поз {position}"] = "-";
-                                    }
-                                }
+                                var val = positionProp.GetValue(startRow);
+                                if (val != null && int.TryParse(val.ToString(), out int num))
+                                    ball = num;
                             }
+                        }
+
+                        if (ball != 0 && ballCounts.ContainsKey(ball))
+                        {
+                            double probability = (double)interval / ballCounts[ball];
+                            row[$"№Поз {position}"] = probability.ToString("F8", CultureInfo.InvariantCulture);
                         }
                         else
                         {
@@ -127,35 +158,35 @@ namespace LottoWebApp.Services
                     dt.Rows.Add(row);
                 }
 
-                string titlePart = string.IsNullOrEmpty(title) ? "A37_Frequency_Distribution_Map" : title;
-                string gameStr = game ?? "unknown";
-                string drawCountStr = drawCount?.ToString() ?? "all";
-
                 string safeFileName = $"{titlePart}_{gameStr}_{drawCountStr}_{interval}_draws_{DateTime.Now:yyyyMMddHHmmss}.csv"
-                    .Replace(" ", "_")
-                    .Replace(":", "_")
-                    .Replace("/", "_")
-                    .Replace("\\", "_");
+                    .Replace(" ", "_").Replace(":", "_").Replace("/", "_").Replace("\\", "_");
 
                 string filePath = await CsvExportService.ExportToCsvAsync(dt, safeFileName);
-
-                string webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-                string relativePathWithoutSlash = filePath.TrimStart('/');
-                string fullPath = Path.Combine(webRootPath, relativePathWithoutSlash);
-
-                if (!System.IO.File.Exists(fullPath))
-                    throw new FileNotFoundException("Файл для экспорта не был создан.", fullPath);
-
-                var bytes = await System.IO.File.ReadAllBytesAsync(fullPath);
-                return new FileContentResult(bytes, "text/csv") { FileDownloadName = Path.GetFileName(fullPath) };
+                createdFiles.Add(filePath);
             }
 
-            // Возвращаем последний файл
-            string lastFileName = $"A37_Frequency_Distribution_Map_{game}_{drawCount?.ToString() ?? "all"}_100_draws_{DateTime.Now:yyyyMMddHHmmss}.csv";
-            string lastFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", lastFileName);
+            using var zipMemoryStream = new MemoryStream();
+            using (var archive = new ZipArchive(zipMemoryStream, ZipArchiveMode.Create, true))
+            {
+                foreach (var filePath in createdFiles)
+                {
+                    string webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+                    string relativePathWithoutSlash = filePath.TrimStart('/');
+                    string fullPath = Path.Combine(webRootPath, relativePathWithoutSlash);
 
-            var lastBytes = await System.IO.File.ReadAllBytesAsync(lastFilePath);
-            return new FileContentResult(lastBytes, "text/csv") { FileDownloadName = lastFileName };
+                    if (System.IO.File.Exists(fullPath))
+                    {
+                        var entry = archive.CreateEntry(Path.GetFileName(fullPath));
+                        using var entryStream = entry.Open();
+                        using var fileStream = System.IO.File.OpenRead(fullPath);
+                        await fileStream.CopyToAsync(entryStream);
+                    }
+                }
+            }
+
+            var zipBytes = zipMemoryStream.ToArray();
+            string zipFileName = $"{titlePart}_{gameStr}_{drawCountStr}_all_intervals_{DateTime.Now:yyyyMMddHHmmss}.zip";
+            return new FileContentResult(zipBytes, "application/zip") { FileDownloadName = zipFileName };
         }
     }
 }
