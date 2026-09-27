@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
-using System.Data;
 using System.Globalization;
 
 namespace LottoWebApp.Pages.Analysis
@@ -34,25 +33,31 @@ namespace LottoWebApp.Pages.Analysis
         [BindProperty(SupportsGet = true)]
         public string? Title { get; set; }
 
+        [BindProperty(SupportsGet = true)]
+        public string? SelectedTable { get; set; }
+
         public Dictionary<(int Number, int Position), int>? DistributionData { get; set; }
+        public Dictionary<string, Dictionary<(int Number, int Position), int>> DistributionDataByField { get; set; } = new();
         public int MaxBallNumber { get; set; }
         public int NumberOfBalls { get; set; }
         public bool IsAlwaysUnordered { get; set; }
+        public bool Is320 { get; set; }
 
         public void Dispose()
         {
             DistributionData?.Clear();
+            DistributionDataByField?.Clear();
         }
 
         public async Task OnGetAsync()
         {
-            string cacheKey = $"A32_{Game}_{DrawCount}_{Direction}";
             if (string.IsNullOrEmpty(Game))
                 Game = "keno";
 
-            // Для 12/24 и БЛИЦ всегда как есть (неупорядоченные)
             IsAlwaysUnordered = (Game?.ToLower() == "1224" || Game?.ToLower() == "blitz");
             if (IsAlwaysUnordered) EnableSorting = false;
+
+            Is320 = Game.Equals("320", StringComparison.OrdinalIgnoreCase);
 
             await GenerateTotalOccurrencesTable();
         }
@@ -62,9 +67,10 @@ namespace LottoWebApp.Pages.Analysis
             if (string.IsNullOrEmpty(Game))
                 return Page();
 
-            // Для 12/24 и БЛИЦ всегда как есть (неупорядоченные)
             IsAlwaysUnordered = (Game?.ToLower() == "1224" || Game?.ToLower() == "blitz");
             if (IsAlwaysUnordered) EnableSorting = false;
+
+            Is320 = Game.Equals("320", StringComparison.OrdinalIgnoreCase);
 
             await GenerateTotalOccurrencesTable();
             return Page();
@@ -87,68 +93,115 @@ namespace LottoWebApp.Pages.Analysis
 
             var first = draws.First();
 
-            var numberProps = first.GetType().GetProperties()
-                .Where(p => (p.Name.StartsWith("B") && int.TryParse(p.Name.Substring(1), out _)) || p.Name == "BB")
-                .OrderBy(p => p.Name == "BB" ? 999 : int.Parse(p.Name.Substring(1)))
-                .ToList();
-
-            if (!numberProps.Any()) return;
-
-            // Определяем параметры для игры
-            (MaxBallNumber, NumberOfBalls) = Game?.ToLower() switch
+            if (Is320)
             {
-                "keno" => (60, 20),
-                "blitz" => (20, 8),
-                "5x36" => (36, 6),
-                "6x49" => (49, 6),
-                "1224" => (24, 12),
-                _ => (60, 20)
-            };
+                MaxBallNumber = 20;
+                NumberOfBalls = 3;
 
-            // Инициализация массива для подсчёта выпадений по позициям для различных игр
-            var totalOccurrencesByPosition = new Dictionary<(int Number, int Position), int>();
-
-            // Перебираем все тиражи
-            foreach (var row in draws)
-            {
-                var currentBalls = new List<int>();
-
-                // Собираем шары текущего тиража, исключая нулевые значения
-                for (int i = 1; i <= NumberOfBalls; i++)
+                var fields = new[] { "B1", "B2" };
+                foreach (var field in fields)
                 {
-                    var prop = numberProps.FirstOrDefault(p => p.Name == $"B{i}");
-                    if (prop != null)
+                    var propNames = new[] { $"{field}1", $"{field}2", $"{field}3" };
+                    var fieldOccurrences = new Dictionary<(int Number, int Position), int>();
+
+                    foreach (var row in draws)
                     {
-                        var val = prop.GetValue(row);
-                        if (val != null && int.TryParse(val.ToString(), out int ball) && ball > 0)
+                        var currentBalls = new List<int>();
+
+                        foreach (var propName in propNames)
                         {
-                            currentBalls.Add(ball);
+                            var prop = first.GetType().GetProperty(propName);
+                            if (prop != null)
+                            {
+                                var val = prop.GetValue(row);
+                                if (val != null && int.TryParse(val.ToString(), out int ball) && ball > 0)
+                                {
+                                    currentBalls.Add(ball);
+                                }
+                            }
+                        }
+
+                        if (EnableSorting && !IsAlwaysUnordered)
+                        {
+                            currentBalls.Sort();
+                        }
+
+                        for (int pos = 0; pos < currentBalls.Count; pos++)
+                        {
+                            int currentBall = currentBalls[pos];
+                            if (currentBall > 0)
+                            {
+                                var key = (currentBall, pos);
+                                if (fieldOccurrences.ContainsKey(key))
+                                    fieldOccurrences[key]++;
+                                else
+                                    fieldOccurrences[key] = 1;
+                            }
+                        }
+                    }
+
+                    DistributionDataByField[field] = fieldOccurrences;
+                }
+            }
+            else
+            {
+                var numberProps = first.GetType().GetProperties()
+                    .Where(p => (p.Name.StartsWith("B") && int.TryParse(p.Name.Substring(1), out _)) || p.Name == "BB")
+                    .OrderBy(p => p.Name == "BB" ? 999 : int.Parse(p.Name.Substring(1)))
+                    .ToList();
+
+                if (!numberProps.Any()) return;
+
+                (MaxBallNumber, NumberOfBalls) = Game?.ToLower() switch
+                {
+                    "keno" => (60, 20),
+                    "blitz" => (20, 8),
+                    "5x36" => (36, 6),
+                    "6x49" => (49, 6),
+                    "1224" => (24, 12),
+                    _ => (60, 20)
+                };
+
+                var totalOccurrencesByPosition = new Dictionary<(int Number, int Position), int>();
+
+                foreach (var row in draws)
+                {
+                    var currentBalls = new List<int>();
+
+                    for (int i = 1; i <= NumberOfBalls; i++)
+                    {
+                        var prop = numberProps.FirstOrDefault(p => p.Name == $"B{i}");
+                        if (prop != null)
+                        {
+                            var val = prop.GetValue(row);
+                            if (val != null && int.TryParse(val.ToString(), out int ball) && ball > 0)
+                            {
+                                currentBalls.Add(ball);
+                            }
+                        }
+                    }
+
+                    if (EnableSorting && !IsAlwaysUnordered)
+                    {
+                        currentBalls.Sort();
+                    }
+
+                    for (int pos = 0; pos < currentBalls.Count; pos++)
+                    {
+                        int currentBall = currentBalls[pos];
+                        if (currentBall > 0)
+                        {
+                            var key = (currentBall, pos);
+                            if (totalOccurrencesByPosition.ContainsKey(key))
+                                totalOccurrencesByPosition[key]++;
+                            else
+                                totalOccurrencesByPosition[key] = 1;
                         }
                     }
                 }
 
-                // Сортировка чисел тиража, если включена опция сортировки
-                if (EnableSorting && !IsAlwaysUnordered)
-                {
-                    currentBalls.Sort();
-                }
-
-                // Подсчитываем количество выпадений чисел по позициям
-                for (int pos = 0; pos < currentBalls.Count; pos++)
-                {
-                    int currentBall = currentBalls[pos];
-                    if (currentBall > 0)
-                    {
-                        var key = (currentBall, pos);
-                        if (totalOccurrencesByPosition.ContainsKey(key))
-                            totalOccurrencesByPosition[key]++;
-                        else
-                            totalOccurrencesByPosition[key] = 1;
-                    }
-                }
+                DistributionData = totalOccurrencesByPosition;
             }
-
-            DistributionData = totalOccurrencesByPosition;
         }
 
         public async Task<IActionResult> OnPostDownloadCsvAsync()
@@ -156,7 +209,7 @@ namespace LottoWebApp.Pages.Analysis
             if (string.IsNullOrEmpty(Game))
                 return BadRequest("Игра обязательна.");
 
-            return await _s.Csv32.ExportAsync(Game, DrawCount, Direction, EnableSorting, Title);
+            return await _s.Csv32.ExportAsync(Game, DrawCount, Direction, EnableSorting, Title, SelectedTable);
         }
     }
 }
