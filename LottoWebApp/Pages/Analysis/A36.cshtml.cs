@@ -33,6 +33,7 @@ namespace LottoWebApp.Pages.Analysis
 
         public List<DistributionResult>? DistributionResults { get; set; }
         public int NumberOfBalls { get; set; }
+        public bool Is320 { get; set; }
 
         public class DistributionResult
         {
@@ -89,6 +90,8 @@ namespace LottoWebApp.Pages.Analysis
 
             if (!numberProps.Any()) return;
 
+            Is320 = Game.Equals("320", StringComparison.OrdinalIgnoreCase);
+
             // Определяем количество шаров для игры
             NumberOfBalls = Game?.ToLower() switch
             {
@@ -97,8 +100,12 @@ namespace LottoWebApp.Pages.Analysis
                 "5x36" => 6,
                 "6x49" => 6,
                 "1224" => 12,
+                "320" => 6,
                 _ => 20
             };
+
+            // Имена свойств для 320
+            var propNames320 = new[] { "B11", "B12", "B13", "B21", "B22", "B23" };
 
             var evenOddDistribution = new Dictionary<int, int>();
             for (int i = 0; i <= NumberOfBalls; i++)
@@ -114,14 +121,32 @@ namespace LottoWebApp.Pages.Analysis
 
                 for (int j = 1; j <= NumberOfBalls; j++)
                 {
-                    var prop = numberProps.FirstOrDefault(p => p.Name == $"B{j}");
-                    if (prop != null)
+                    int currentBall = 0;
+
+                    if (Is320)
                     {
-                        var val = prop.GetValue(row);
-                        if (val != null && int.TryParse(val.ToString(), out int currentBall) && currentBall != 0 && currentBall % 2 == 0)
+                        var prop = first.GetType().GetProperty(propNames320[j - 1]);
+                        if (prop != null)
                         {
-                            evenCount++;
+                            var val = prop.GetValue(row);
+                            if (val != null && int.TryParse(val.ToString(), out int num))
+                                currentBall = num;
                         }
+                    }
+                    else
+                    {
+                        var prop = numberProps.FirstOrDefault(p => p.Name == $"B{j}");
+                        if (prop != null)
+                        {
+                            var val = prop.GetValue(row);
+                            if (val != null && int.TryParse(val.ToString(), out int num))
+                                currentBall = num;
+                        }
+                    }
+
+                    if (currentBall != 0 && currentBall % 2 == 0)
+                    {
+                        evenCount++;
                     }
                 }
 

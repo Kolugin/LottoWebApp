@@ -1,11 +1,8 @@
-﻿using DocumentFormat.OpenXml.Wordprocessing;
-using LottoWebApp.Data;
+﻿using LottoWebApp.Data;
 using LottoWebApp.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
-using System.Globalization;
-using System.Text;
 
 namespace LottoWebApp.Services
 {
@@ -46,6 +43,8 @@ namespace LottoWebApp.Services
             if (!numberProps.Any())
                 throw new InvalidOperationException("Не найдены столбцы чисел.");
 
+            bool is320 = game.Equals("320", StringComparison.OrdinalIgnoreCase);
+
             // Определяем количество шаров для игры
             int numberOfBalls = game?.ToLower() switch
             {
@@ -54,8 +53,11 @@ namespace LottoWebApp.Services
                 "5x36" => 6,
                 "6x49" => 6,
                 "1224" => 12,
+                "320" => 6,
                 _ => 20
             };
+
+            var propNames320 = new[] { "B11", "B12", "B13", "B21", "B22", "B23" };
 
             var evenOddDistribution = new Dictionary<int, int>();
             for (int i = 0; i <= numberOfBalls; i++)
@@ -71,14 +73,32 @@ namespace LottoWebApp.Services
 
                 for (int j = 1; j <= numberOfBalls; j++)
                 {
-                    var prop = numberProps.FirstOrDefault(p => p.Name == $"B{j}");
-                    if (prop != null)
+                    int currentBall = 0;
+
+                    if (is320)
                     {
-                        var val = prop.GetValue(row);
-                        if (val != null && int.TryParse(val.ToString(), out int currentBall) && currentBall != 0 && currentBall % 2 == 0)
+                        var prop = first.GetType().GetProperty(propNames320[j - 1]);
+                        if (prop != null)
                         {
-                            evenCount++;
+                            var val = prop.GetValue(row);
+                            if (val != null && int.TryParse(val.ToString(), out int num))
+                                currentBall = num;
                         }
+                    }
+                    else
+                    {
+                        var prop = numberProps.FirstOrDefault(p => p.Name == $"B{j}");
+                        if (prop != null)
+                        {
+                            var val = prop.GetValue(row);
+                            if (val != null && int.TryParse(val.ToString(), out int num))
+                                currentBall = num;
+                        }
+                    }
+
+                    if (currentBall != 0 && currentBall % 2 == 0)
+                    {
+                        evenCount++;
                     }
                 }
 
@@ -112,10 +132,7 @@ namespace LottoWebApp.Services
             string drawCountStr = drawCount?.ToString() ?? "all";
 
             string safeFileName = $"{titlePart}_{gameStr}_{drawCountStr}_{DateTime.Now:yyyyMMddHHmmss}.csv"
-                .Replace(" ", "_")
-                .Replace(":", "_")
-                .Replace("/", "_")
-                .Replace("\\", "_");
+                .Replace(" ", "_").Replace(":", "_").Replace("/", "_").Replace("\\", "_");
 
             string filePath = await CsvExportService.ExportToCsvAsync(dt, safeFileName);
 
