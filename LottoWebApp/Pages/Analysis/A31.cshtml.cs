@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
-using System.Data;
 using System.Globalization;
 
 namespace LottoWebApp.Pages.Analysis
@@ -53,7 +52,6 @@ namespace LottoWebApp.Pages.Analysis
 
         public async Task OnGetAsync()
         {
-            string cacheKey = $"A31_{Game}_{DrawCount}_{Direction}";
             if (string.IsNullOrEmpty(Game))
                 Game = "keno";
 
@@ -91,20 +89,33 @@ namespace LottoWebApp.Pages.Analysis
                 .OrderBy(p => p.Name == "BB" ? 999 : int.Parse(p.Name.Substring(1)))
                 .ToList();
 
-            if (!numberProps.Any()) return;
+            bool is320 = Game.Equals("320", StringComparison.OrdinalIgnoreCase);
 
             // Определяем параметры для игры
-            (MaxBallNumber, NumberOfBalls, UseBonus, HasTime) = Game?.ToLower() switch
+            if (is320)
             {
-                "keno" => (60, 20, false, false),
-                "blitz" => (20, 8, true, true),
-                "5x36" => (36, 6, false, false),
-                "6x49" => (49, 6, false, false),
-                "1224" => (24, 12, false, true),
-                _ => (60, 20, false, false)
-            };
+                MaxBallNumber = 20;
+                NumberOfBalls = 6; // 3 из B1 + 3 из B2
+                UseBonus = false;
+                HasTime = true;
+            }
+            else
+            {
+                (MaxBallNumber, NumberOfBalls, UseBonus, HasTime) = Game?.ToLower() switch
+                {
+                    "keno" => (60, 20, false, false),
+                    "blitz" => (20, 8, true, true),
+                    "5x36" => (36, 6, false, false),
+                    "6x49" => (49, 6, false, false),
+                    "1224" => (24, 12, false, true),
+                    _ => (60, 20, false, false)
+                };
+            }
 
             MapData = new List<MapRowResult>();
+
+            // Имена свойств для 320
+            var propNames320 = new[] { "B11", "B12", "B13", "B21", "B22", "B23" };
 
             foreach (var row in draws)
             {
@@ -121,35 +132,55 @@ namespace LottoWebApp.Pages.Analysis
                 if (HasTime && timeProp != null)
                     mapRow.Time = timeProp.GetValue(row)?.ToString();
 
-                // Заполняем HashSet шаров
                 var drawBalls = new HashSet<int>();
-                for (int i = 1; i <= NumberOfBalls; i++)
+
+                if (is320)
                 {
-                    var prop = numberProps.FirstOrDefault(p => p.Name == $"B{i}");
-                    if (prop != null)
+                    // Для 320 объединяем B1 и B2 в одну таблицу
+                    foreach (var propName in propNames320)
                     {
-                        var val = prop.GetValue(row);
-                        if (val != null && int.TryParse(val.ToString(), out int num) && num > 0)
+                        var prop = first.GetType().GetProperty(propName);
+                        if (prop != null)
                         {
-                            drawBalls.Add(num);
+                            var val = prop.GetValue(row);
+                            if (val != null && int.TryParse(val.ToString(), out int num) && num > 0)
+                            {
+                                drawBalls.Add(num);
+                            }
                         }
                     }
                 }
+                else
+                {
+                    // Стандартная логика для остальных игр
+                    for (int i = 1; i <= NumberOfBalls; i++)
+                    {
+                        var prop = numberProps.FirstOrDefault(p => p.Name == $"B{i}");
+                        if (prop != null)
+                        {
+                            var val = prop.GetValue(row);
+                            if (val != null && int.TryParse(val.ToString(), out int num) && num > 0)
+                            {
+                                drawBalls.Add(num);
+                            }
+                        }
+                    }
+
+                    if (UseBonus)
+                    {
+                        var bbProp = numberProps.FirstOrDefault(p => p.Name == "BB");
+                        if (bbProp != null)
+                        {
+                            var bbVal = bbProp.GetValue(row);
+                            if (bbVal != null && int.TryParse(bbVal.ToString(), out int bonusBall))
+                            {
+                                mapRow.BonusNumber = bonusBall;
+                            }
+                        }
+                    }
+                }
+
                 mapRow.BallNumbers = drawBalls.OrderBy(x => x).ToList();
-
-                if (UseBonus)
-                {
-                    var bbProp = numberProps.FirstOrDefault(p => p.Name == "BB");
-                    if (bbProp != null)
-                    {
-                        var bbVal = bbProp.GetValue(row);
-                        if (bbVal != null && int.TryParse(bbVal.ToString(), out int bonusBall))
-                        {
-                            mapRow.BonusNumber = bonusBall;
-                        }
-                    }
-                }
-
                 MapData.Add(mapRow);
             }
         }

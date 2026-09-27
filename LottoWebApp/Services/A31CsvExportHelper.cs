@@ -1,11 +1,8 @@
-﻿using DocumentFormat.OpenXml.Wordprocessing;
-using LottoWebApp.Data;
+﻿using LottoWebApp.Data;
 using LottoWebApp.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
-using System.Globalization;
-using System.Text;
 
 namespace LottoWebApp.Services
 {
@@ -43,23 +40,31 @@ namespace LottoWebApp.Services
                 .OrderBy(p => p.Name == "BB" ? 999 : int.Parse(p.Name.Substring(1)))
                 .ToList();
 
-            if (!numberProps.Any())
-                throw new InvalidOperationException("Не найдены столбцы чисел.");
+            bool is320 = game.Equals("320", StringComparison.OrdinalIgnoreCase);
 
-            // Определяем параметры для игры
             int maxBallNumber, numberOfBalls;
             bool useBonus, hasTime;
-            (maxBallNumber, numberOfBalls, useBonus, hasTime) = game?.ToLower() switch
-            {
-                "keno" => (60, 20, false, false),
-                "blitz" => (20, 8, true, true),
-                "5x36" => (36, 6, false, false),
-                "6x49" => (49, 6, false, false),
-                "1224" => (24, 12, false, true),
-                _ => (60, 20, false, false)
-            };
 
-            // Создаем DataTable
+            if (is320)
+            {
+                maxBallNumber = 20;
+                numberOfBalls = 6;
+                useBonus = false;
+                hasTime = true;
+            }
+            else
+            {
+                (maxBallNumber, numberOfBalls, useBonus, hasTime) = game?.ToLower() switch
+                {
+                    "keno" => (60, 20, false, false),
+                    "blitz" => (20, 8, true, true),
+                    "5x36" => (36, 6, false, false),
+                    "6x49" => (49, 6, false, false),
+                    "1224" => (24, 12, false, true),
+                    _ => (60, 20, false, false)
+                };
+            }
+
             DataTable dt = new DataTable();
             dt.Columns.Add("Тираж", typeof(int));
             dt.Columns.Add("Дата", typeof(string));
@@ -73,10 +78,11 @@ namespace LottoWebApp.Services
                 for (int bonus = 1; bonus <= 4; bonus++)
                     dt.Columns.Add($"Бонус {bonus}", typeof(string));
 
-            // Предзагружаем имена колонок один раз
-            var columnNames = new string[maxBallNumber + 1]; // 1-based
+            var columnNames = new string[maxBallNumber + 1];
             for (int i = 1; i <= maxBallNumber; i++)
                 columnNames[i] = $"№{i}";
+
+            var propNames320 = new[] { "B11", "B12", "B13", "B21", "B22", "B23" };
 
             foreach (var row in draws)
             {
@@ -92,22 +98,39 @@ namespace LottoWebApp.Services
                 if (hasTime && timeProp != null)
                     newRow["Время"] = timeProp.GetValue(row)?.ToString() ?? "";
 
-                // Заполняем HashSet шаров
                 var drawBalls = new HashSet<int>();
-                for (int i = 1; i <= numberOfBalls; i++)
+
+                if (is320)
                 {
-                    var prop = numberProps.FirstOrDefault(p => p.Name == $"B{i}");
-                    if (prop != null)
+                    foreach (var propName in propNames320)
                     {
-                        var val = prop.GetValue(row);
-                        if (val != null && int.TryParse(val.ToString(), out int num) && num > 0)
+                        var prop = first.GetType().GetProperty(propName);
+                        if (prop != null)
                         {
-                            drawBalls.Add(num);
+                            var val = prop.GetValue(row);
+                            if (val != null && int.TryParse(val.ToString(), out int num) && num > 0)
+                            {
+                                drawBalls.Add(num);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = 1; i <= numberOfBalls; i++)
+                    {
+                        var prop = numberProps.FirstOrDefault(p => p.Name == $"B{i}");
+                        if (prop != null)
+                        {
+                            var val = prop.GetValue(row);
+                            if (val != null && int.TryParse(val.ToString(), out int num) && num > 0)
+                            {
+                                drawBalls.Add(num);
+                            }
                         }
                     }
                 }
 
-                // Записываем только выпавшие числа
                 for (int ball = 1; ball <= maxBallNumber; ball++)
                 {
                     newRow[columnNames[ball]] = drawBalls.Contains(ball) ? ball.ToString() : "*";
@@ -141,10 +164,7 @@ namespace LottoWebApp.Services
             string drawCountStr = drawCount?.ToString() ?? "all";
 
             string safeFileName = $"{titlePart}_{gameStr}_{drawCountStr}_{DateTime.Now:yyyyMMddHHmmss}.csv"
-                .Replace(" ", "_")
-                .Replace(":", "_")
-                .Replace("/", "_")
-                .Replace("\\", "_");
+                .Replace(" ", "_").Replace(":", "_").Replace("/", "_").Replace("\\", "_");
 
             string filePath = await CsvExportService.ExportToCsvAsync(dt, safeFileName);
 
