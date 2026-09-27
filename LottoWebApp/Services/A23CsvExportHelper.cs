@@ -1,10 +1,8 @@
-﻿using DocumentFormat.OpenXml.Wordprocessing;
-using LottoWebApp.Data;
+﻿using LottoWebApp.Data;
 using LottoWebApp.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
-using System.Globalization;
 
 namespace LottoWebApp.Services
 {
@@ -16,14 +14,12 @@ namespace LottoWebApp.Services
             _db = db;
         }
 
-        public async Task<FileResult> ExportAsync(string? game, int? drawCount, string? direction, string? title)
+        public async Task<FileResult> ExportAsync(string? game, int? drawCount, string? direction, string? title, string? selectedTable = null)
         {
             if (string.IsNullOrEmpty(game))
                 game = "keno";
 
             var query = new LotteryQueryProvider(_db).GetQuery(game);
-
-            // Для правильного расчета пауз всегда сортируем по возрастанию номера тиража
             query = query.OrderBy(e => EF.Property<int>(e, "Draw"));
 
             if (drawCount.HasValue && drawCount.Value > 0)
@@ -34,65 +30,74 @@ namespace LottoWebApp.Services
                 throw new InvalidOperationException("Нет данных для экспорта.");
 
             var first = draws.First();
+            bool is320 = game.Equals("320", StringComparison.OrdinalIgnoreCase);
 
-            var numberProps = first.GetType().GetProperties()
-                .Where(p => (p.Name.StartsWith("B") && int.TryParse(p.Name.Substring(1), out _)) || p.Name == "BB")
-                .OrderBy(p => p.Name == "BB" ? 999 : int.Parse(p.Name.Substring(1)))
-                .ToList();
+            string exportField = null;
+            if (is320)
+            {
+                exportField = selectedTable?.ToLowerInvariant() switch
+                {
+                    "b1" => "B1",
+                    "b2" => "B2",
+                    _ => "B1"
+                };
+            }
 
-            if (!numberProps.Any())
-                throw new InvalidOperationException("Не найдены столбцы чисел.");
-
-            // Определяем параметры для игры
             int totalBalls = 0;
             int ballCount = 0;
             bool hasTime = false;
             bool hasBonus = false;
 
-            switch (game?.ToLower())
+            if (is320)
             {
-                case "keno":
-                    totalBalls = 60;
-                    ballCount = 20;
-                    hasTime = false;
-                    hasBonus = false;
-                    break;
-                case "blitz":
-                    totalBalls = 20;
-                    ballCount = 8;
-                    hasTime = true;
-                    hasBonus = true;
-                    break;
-                case "5x36":
-                    totalBalls = 36;
-                    ballCount = 6;
-                    hasTime = false;
-                    hasBonus = false;
-                    break;
-                case "6x49":
-                    totalBalls = 49;
-                    ballCount = 6;
-                    hasTime = false;
-                    hasBonus = false;
-                    break;
-                case "1224":
-                    totalBalls = 24;
-                    ballCount = 12;
-                    hasTime = true;
-                    hasBonus = false;
-                    break;
-                default:
-                    totalBalls = 60;
-                    ballCount = 20;
-                    hasTime = false;
-                    hasBonus = false;
-                    break;
+                totalBalls = 20;
+                ballCount = 3;
+                hasTime = true;
+                hasBonus = false;
+            }
+            else
+            {
+                switch (game?.ToLower())
+                {
+                    case "keno":
+                        totalBalls = 60;
+                        ballCount = 20;
+                        hasTime = false;
+                        hasBonus = false;
+                        break;
+                    case "blitz":
+                        totalBalls = 20;
+                        ballCount = 8;
+                        hasTime = true;
+                        hasBonus = true;
+                        break;
+                    case "5x36":
+                        totalBalls = 36;
+                        ballCount = 6;
+                        hasTime = false;
+                        hasBonus = false;
+                        break;
+                    case "6x49":
+                        totalBalls = 49;
+                        ballCount = 6;
+                        hasTime = false;
+                        hasBonus = false;
+                        break;
+                    case "1224":
+                        totalBalls = 24;
+                        ballCount = 12;
+                        hasTime = true;
+                        hasBonus = false;
+                        break;
+                    default:
+                        totalBalls = 60;
+                        ballCount = 20;
+                        hasTime = false;
+                        hasBonus = false;
+                        break;
+                }
             }
 
-            int[] pauseCounters = new int[totalBalls + 1];
-            int[] bonusPauseCounters = new int[5]; // для 1..4 бонусных
-
-            // Создаем DataTable
             DataTable dt = new DataTable();
             dt.Columns.Add("Тираж");
             dt.Columns.Add("Дата");
@@ -105,7 +110,6 @@ namespace LottoWebApp.Services
                 dt.Columns.Add($"№{i}");
             }
 
-            // Добавляем колонки бонусов, если нужно
             if (hasBonus)
             {
                 for (int b = 1; b <= 4; b++)
@@ -113,6 +117,9 @@ namespace LottoWebApp.Services
                     dt.Columns.Add($"Бонус {b}");
                 }
             }
+
+            int[] pauseCounters = new int[totalBalls + 1];
+            int[] bonusPauseCounters = new int[5];
 
             var tempRows = new List<object[]>();
 
@@ -129,26 +136,49 @@ namespace LottoWebApp.Services
                 var dateValue = dateProp.GetValue(rowObj);
                 var timeValue = hasTime && timeProp != null ? timeProp.GetValue(rowObj) : null;
 
-                // Выпавшие основные шары
                 var drawnBalls = new HashSet<int>();
-                for (int i = 1; i <= ballCount; i++)
+
+                if (is320)
                 {
-                    var prop = numberProps.FirstOrDefault(p => p.Name == $"B{i}");
-                    if (prop != null)
+                    var propNames = new[] { $"{exportField}1", $"{exportField}2", $"{exportField}3" };
+                    foreach (var propName in propNames)
                     {
-                        var val = prop.GetValue(rowObj);
-                        if (val != null && int.TryParse(val.ToString(), out int num) && num > 0)
+                        var prop = rowType.GetProperty(propName);
+                        if (prop != null)
                         {
-                            drawnBalls.Add(num);
+                            var val = prop.GetValue(rowObj);
+                            if (val != null && int.TryParse(val.ToString(), out int num) && num > 0)
+                            {
+                                drawnBalls.Add(num);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    var numberProps = first.GetType().GetProperties()
+                        .Where(p => (p.Name.StartsWith("B") && int.TryParse(p.Name.Substring(1), out _)) || p.Name == "BB")
+                        .OrderBy(p => p.Name == "BB" ? 999 : int.Parse(p.Name.Substring(1)))
+                        .ToList();
+
+                    for (int i = 1; i <= ballCount; i++)
+                    {
+                        var prop = numberProps.FirstOrDefault(p => p.Name == $"B{i}");
+                        if (prop != null)
+                        {
+                            var val = prop.GetValue(rowObj);
+                            if (val != null && int.TryParse(val.ToString(), out int num) && num > 0)
+                            {
+                                drawnBalls.Add(num);
+                            }
                         }
                     }
                 }
 
-                // Выпавший бонус
                 int bonusBall = 0;
                 if (hasBonus)
                 {
-                    var bbProp = numberProps.FirstOrDefault(p => p.Name == "BB");
+                    var bbProp = rowType.GetProperty("BB");
                     if (bbProp != null)
                     {
                         var val = bbProp.GetValue(rowObj);
@@ -169,7 +199,6 @@ namespace LottoWebApp.Services
                     colIndex++;
                 }
 
-                // Паузы по основным шарам
                 for (int ball = 1; ball <= totalBalls; ball++)
                 {
                     if (drawnBalls.Contains(ball))
@@ -181,7 +210,6 @@ namespace LottoWebApp.Services
                     colIndex++;
                 }
 
-                // Паузы по бонусу (обычно 1–4)
                 if (hasBonus)
                 {
                     for (int b = 1; b <= 4; b++)
@@ -199,11 +227,9 @@ namespace LottoWebApp.Services
                 tempRows.Add(newRow);
             }
 
-            // Добавляем строки в правильном порядке
             bool isDesc = direction == "newToOld";
             if (isDesc)
             {
-                // Если изначально было сортировка по убыванию, то добавляем в обратном порядке
                 foreach (var row in tempRows.AsEnumerable().Reverse())
                 {
                     dt.Rows.Add(row);
@@ -220,12 +246,10 @@ namespace LottoWebApp.Services
             string titlePart = string.IsNullOrEmpty(title) ? "A23_Ball_Pause_Map" : title;
             string gameStr = game ?? "unknown";
             string drawCountStr = drawCount?.ToString() ?? "all";
+            string fieldStr = is320 ? $"_{exportField}" : "";
 
-            string safeFileName = $"{titlePart}_{gameStr}_{drawCountStr}_{DateTime.Now:yyyyMMddHHmmss}.csv"
-                .Replace(" ", "_")
-                .Replace(":", "_")
-                .Replace("/", "_")
-                .Replace("\\", "_");
+            string safeFileName = $"{titlePart}_{gameStr}{fieldStr}_{drawCountStr}_{DateTime.Now:yyyyMMddHHmmss}.csv"
+                .Replace(" ", "_").Replace(":", "_").Replace("/", "_").Replace("\\", "_");
 
             string filePath = await CsvExportService.ExportToCsvAsync(dt, safeFileName);
 
