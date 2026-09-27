@@ -33,6 +33,8 @@ namespace LottoWebApp.Pages.Analysis
 
         public DataTable? ResultsTable { get; set; }
         public int NumberOfBalls { get; set; }
+        public bool HasTime { get; set; }
+        public bool Is320 { get; set; }
 
         public void Dispose()
         {
@@ -81,59 +83,95 @@ namespace LottoWebApp.Pages.Analysis
 
             if (!numberProps.Any()) return;
 
+            Is320 = Game.Equals("320", StringComparison.OrdinalIgnoreCase);
+
             // Определяем количество шаров для игры
-            NumberOfBalls = Game?.ToLower() switch
+            (NumberOfBalls, HasTime) = Game?.ToLower() switch
             {
-                "keno" => 20,
-                "blitz" => 8,
-                "5x36" => 6,
-                "6x49" => 6,
-                "1224" => 12,
-                _ => 20
+                "keno" => (20, false),
+                "blitz" => (8, true),
+                "5x36" => (6, false),
+                "6x49" => (6, false),
+                "1224" => (12, true),
+                "320" => (6, true),
+                _ => (20, false)
             };
+
+            // Имена свойств для 320
+            var propNames320 = new[] { "B11", "B12", "B13", "B21", "B22", "B23" };
 
             ResultsTable = new DataTable();
             ResultsTable.Columns.Add("Тираж", typeof(int));
             ResultsTable.Columns.Add("Дата", typeof(string));
+            if (HasTime)
+                ResultsTable.Columns.Add("Время", typeof(string));
+
             for (int i = 1; i <= NumberOfBalls; i++)
             {
                 ResultsTable.Columns.Add($"№П {i}", typeof(string));
             }
 
             int rowCount = draws.Count;
+            int baseColumns = HasTime ? 3 : 2;
 
             for (int i = 0; i < rowCount; i++)
             {
                 var currentRow = draws[i];
-                var values = new object[2 + NumberOfBalls];
+                var values = new object[baseColumns + NumberOfBalls];
 
                 var drawProp = first.GetType().GetProperty("Draw");
                 var dateProp = first.GetType().GetProperty("Date");
+                var timeProp = HasTime ? first.GetType().GetProperty("Time") : null;
 
                 values[0] = Convert.ToInt32(drawProp?.GetValue(currentRow) ?? 0);
                 values[1] = dateProp?.GetValue(currentRow)?.ToString() ?? "";
 
+                int colIndex = 2;
+                if (HasTime && timeProp != null)
+                {
+                    values[colIndex] = timeProp.GetValue(currentRow)?.ToString() ?? "";
+                    colIndex++;
+                }
+
                 for (int j = 1; j <= NumberOfBalls; j++)
                 {
-                    var prop = numberProps.FirstOrDefault(p => p.Name == $"B{j}");
                     int value = 0;
-                    if (prop != null)
+
+                    if (Is320)
                     {
-                        var val = prop.GetValue(currentRow);
-                        if (val != null && int.TryParse(val.ToString(), out int num))
+                        // Для 320 читаем по именам B11, B12, B13, B21, B22, B23
+                        var prop = first.GetType().GetProperty(propNames320[j - 1]);
+                        if (prop != null)
                         {
-                            value = num;
+                            var val = prop.GetValue(currentRow);
+                            if (val != null && int.TryParse(val.ToString(), out int num))
+                            {
+                                value = num;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var prop = numberProps.FirstOrDefault(p => p.Name == $"B{j}");
+                        if (prop != null)
+                        {
+                            var val = prop.GetValue(currentRow);
+                            if (val != null && int.TryParse(val.ToString(), out int num))
+                            {
+                                value = num;
+                            }
                         }
                     }
 
                     if (value == 0)
                     {
-                        values[j + 1] = "-";
+                        values[colIndex] = "-";
                     }
                     else
                     {
-                        values[j + 1] = (value % 2 == 0) ? "Ч" : "Н";
+                        values[colIndex] = (value % 2 == 0) ? "Ч" : "Н";
                     }
+                    colIndex++;
                 }
 
                 ResultsTable.Rows.Add(values);

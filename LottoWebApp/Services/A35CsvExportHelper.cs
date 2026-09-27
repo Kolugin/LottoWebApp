@@ -1,11 +1,8 @@
-﻿using DocumentFormat.OpenXml.Wordprocessing;
-using LottoWebApp.Data;
+﻿using LottoWebApp.Data;
 using LottoWebApp.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
-using System.Globalization;
-using System.Text;
 
 namespace LottoWebApp.Services
 {
@@ -46,20 +43,29 @@ namespace LottoWebApp.Services
             if (!numberProps.Any())
                 throw new InvalidOperationException("Не найдены столбцы чисел.");
 
-            // Определяем количество шаров для игры
-            int numberOfBalls = game?.ToLower() switch
+            bool is320 = game.Equals("320", StringComparison.OrdinalIgnoreCase);
+
+            int numberOfBalls;
+            bool hasTime;
+            (numberOfBalls, hasTime) = game?.ToLower() switch
             {
-                "keno" => 20,
-                "blitz" => 8,
-                "5x36" => 6,
-                "6x49" => 6,
-                "1224" => 12,
-                _ => 20
+                "keno" => (20, false),
+                "blitz" => (8, true),
+                "5x36" => (6, false),
+                "6x49" => (6, false),
+                "1224" => (12, true),
+                "320" => (6, true),
+                _ => (20, false)
             };
+
+            var propNames320 = new[] { "B11", "B12", "B13", "B21", "B22", "B23" };
 
             var resultsTable = new DataTable();
             resultsTable.Columns.Add("Тираж", typeof(int));
             resultsTable.Columns.Add("Дата", typeof(string));
+            if (hasTime)
+                resultsTable.Columns.Add("Время", typeof(string));
+
             for (int i = 1; i <= numberOfBalls; i++)
             {
                 resultsTable.Columns.Add($"№П {i}", typeof(string));
@@ -70,35 +76,61 @@ namespace LottoWebApp.Services
             for (int i = 0; i < rowCount; i++)
             {
                 var currentRow = draws[i];
-                var values = new object[2 + numberOfBalls];
+                int baseColumns = hasTime ? 3 : 2;
+                var values = new object[baseColumns + numberOfBalls];
 
                 var drawProp = first.GetType().GetProperty("Draw");
                 var dateProp = first.GetType().GetProperty("Date");
+                var timeProp = hasTime ? first.GetType().GetProperty("Time") : null;
 
                 values[0] = Convert.ToInt32(drawProp?.GetValue(currentRow) ?? 0);
                 values[1] = dateProp?.GetValue(currentRow)?.ToString() ?? "";
 
+                int colIndex = 2;
+                if (hasTime && timeProp != null)
+                {
+                    values[colIndex] = timeProp.GetValue(currentRow)?.ToString() ?? "";
+                    colIndex++;
+                }
+
                 for (int j = 1; j <= numberOfBalls; j++)
                 {
-                    var prop = numberProps.FirstOrDefault(p => p.Name == $"B{j}");
                     int value = 0;
-                    if (prop != null)
+
+                    if (is320)
                     {
-                        var val = prop.GetValue(currentRow);
-                        if (val != null && int.TryParse(val.ToString(), out int num))
+                        var prop = first.GetType().GetProperty(propNames320[j - 1]);
+                        if (prop != null)
                         {
-                            value = num;
+                            var val = prop.GetValue(currentRow);
+                            if (val != null && int.TryParse(val.ToString(), out int num))
+                            {
+                                value = num;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var prop = numberProps.FirstOrDefault(p => p.Name == $"B{j}");
+                        if (prop != null)
+                        {
+                            var val = prop.GetValue(currentRow);
+                            if (val != null && int.TryParse(val.ToString(), out int num))
+                            {
+                                value = num;
+                            }
                         }
                     }
 
                     if (value == 0)
                     {
-                        values[j + 1] = "-";
+                        values[colIndex] = "-";
                     }
                     else
                     {
-                        values[j + 1] = (value % 2 == 0) ? "Ч" : "Н";
+                        values[colIndex] = (value % 2 == 0) ? "Ч" : "Н";
                     }
+                    colIndex++;
                 }
 
                 resultsTable.Rows.Add(values);
@@ -109,10 +141,7 @@ namespace LottoWebApp.Services
             string drawCountStr = drawCount?.ToString() ?? "all";
 
             string safeFileName = $"{titlePart}_{gameStr}_{drawCountStr}_{DateTime.Now:yyyyMMddHHmmss}.csv"
-                .Replace(" ", "_")
-                .Replace(":", "_")
-                .Replace("/", "_")
-                .Replace("\\", "_");
+                .Replace(" ", "_").Replace(":", "_").Replace("/", "_").Replace("\\", "_");
 
             string filePath = await CsvExportService.ExportToCsvAsync(resultsTable, safeFileName);
 

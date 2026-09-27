@@ -41,6 +41,10 @@
                     <tr>
                         <th>Тираж</th>
                         <th>Дата</th>
+                        @if (Model.HasTime)
+                        {
+                            <th>Время</th>
+                        }
                         @for (int i = 1; i <= Model.NumberOfBalls; i++)
                         {
                             <th>№П @i</th>
@@ -53,9 +57,15 @@
                         <tr>
                             <td>@Model.ResultsTable.Rows[i]["Тираж"]</td>
                             <td>@Model.ResultsTable.Rows[i]["Дата"]</td>
+                            @if (Model.HasTime)
+                            {
+                                <td>@Model.ResultsTable.Rows[i]["Время"]</td>
+                            }
                             @for (int j = 1; j <= Model.NumberOfBalls; j++)
                             {
-                                <td class="@(Model.ResultsTable.Rows[i][$"№П {j}"].ToString() == "Ч" ? "even-cell" : "odd-cell")">@Model.ResultsTable.Rows[i][$"№П {j}"]</td>
+                                var cellValue = Model.ResultsTable.Rows[i][$"№П {j}"].ToString();
+                                var cellClass = cellValue == "Ч" ? "even-cell" : (cellValue == "Н" ? "odd-cell" : "");
+                                <td class="@cellClass">@cellValue</td>
                             }
                         </tr>
                     }
