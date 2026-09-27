@@ -1,5 +1,4 @@
-﻿using DocumentFormat.OpenXml.Wordprocessing;
-using LottoWebApp.Data;
+﻿using LottoWebApp.Data;
 using LottoWebApp.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -46,17 +45,20 @@ namespace LottoWebApp.Services
             if (!numberProps.Any())
                 throw new InvalidOperationException("Не найдены столбцы чисел.");
 
-            // Определяем параметры для игры
+            bool is320 = game.Equals("320", StringComparison.OrdinalIgnoreCase);
+
             int maxBallNumber, numberOfBalls;
-            bool canIncludeBonus;
-            (maxBallNumber, numberOfBalls, canIncludeBonus) = game?.ToLower() switch
+            bool canIncludeBonus, hasTime;
+
+            (maxBallNumber, numberOfBalls, canIncludeBonus, hasTime) = game?.ToLower() switch
             {
-                "keno" => (60, 20, false),
-                "blitz" => (20, 8, true),
-                "5x36" => (36, 6, false),
-                "6x49" => (49, 6, false),
-                "1224" => (24, 12, false),
-                _ => (60, 20, false)
+                "keno" => (60, 20, false, false),
+                "blitz" => (20, 8, true, true),
+                "5x36" => (36, 6, false, false),
+                "6x49" => (49, 6, false, false),
+                "1224" => (24, 12, false, true),
+                "320" => (20, 6, false, true),
+                _ => (60, 20, false, false)
             };
 
             if (includeBonus && !canIncludeBonus)
@@ -65,27 +67,47 @@ namespace LottoWebApp.Services
             var combinations = GenerateCombinations(combinationSize, 1, maxBallNumber).ToList();
             var parsedCombinations = combinations
                 .Select(c => c.Split('_').Select(int.Parse).ToArray())
-                .ToArray(); // индексируем по позиции
+                .ToArray();
 
-            var matchedMap = new Dictionary<int, HashSet<int>>(); // drawID -> set of matched indexes
-
+            var matchedMap = new Dictionary<int, HashSet<int>>();
             var drawBallsMap = new Dictionary<int, HashSet<int>>();
             var bonusBallMap = new Dictionary<int, int>();
+
+            var propNames320 = new[] { "B11", "B12", "B13", "B21", "B22", "B23" };
 
             foreach (var row in draws)
             {
                 int drawNumber = Convert.ToInt32(first.GetType().GetProperty("Draw")?.GetValue(row) ?? 0);
 
                 var drawBalls = new HashSet<int>();
-                for (int i = 1; i <= numberOfBalls; i++)
+
+                if (is320)
                 {
-                    var prop = numberProps.FirstOrDefault(p => p.Name == $"B{i}");
-                    if (prop != null)
+                    foreach (var propName in propNames320)
                     {
-                        var val = prop.GetValue(row);
-                        if (val != null && int.TryParse(val.ToString(), out int ball) && ball > 0)
+                        var prop = first.GetType().GetProperty(propName);
+                        if (prop != null)
                         {
-                            drawBalls.Add(ball);
+                            var val = prop.GetValue(row);
+                            if (val != null && int.TryParse(val.ToString(), out int ball) && ball > 0)
+                            {
+                                drawBalls.Add(ball);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = 1; i <= numberOfBalls; i++)
+                    {
+                        var prop = numberProps.FirstOrDefault(p => p.Name == $"B{i}");
+                        if (prop != null)
+                        {
+                            var val = prop.GetValue(row);
+                            if (val != null && int.TryParse(val.ToString(), out int ball) && ball > 0)
+                            {
+                                drawBalls.Add(ball);
+                            }
                         }
                     }
                 }
@@ -133,7 +155,6 @@ namespace LottoWebApp.Services
                 matchedMap[drawNumber] = matchedIndexes;
             }
 
-            // Экспорт результатов в CSV
             string baseFileName = $"3.3_{game.ToUpper()}_Комбинация_{combinationSize}_чисел{(includeBonus ? "_+1Б" : "")}";
             string extension = ".csv";
             string fullBasePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", baseFileName);
@@ -142,7 +163,7 @@ namespace LottoWebApp.Services
             int maxColumnsPerFile = 15000;
 
             var baseHeaders = new List<string> { "Тираж", "Дата" };
-            if (game?.ToLower() == "blitz" || game?.ToLower() == "1224")
+            if (hasTime)
                 baseHeaders.Add("Время");
 
             int totalCombinations = combinations.Count;
@@ -175,7 +196,6 @@ namespace LottoWebApp.Services
                             await writer.FlushAsync();
                             await writer.DisposeAsync();
 
-                            // Добавляем файл в список перед созданием нового
                             createdFiles.Add(currentFilePath);
 
                             rowBlockIndex++;
@@ -191,7 +211,7 @@ namespace LottoWebApp.Services
                         var dateProp = first.GetType().GetProperty("Date");
                         string date = dateProp?.GetValue(row)?.ToString() ?? "";
 
-                        var timeProp = (game?.ToLower() == "blitz" || game?.ToLower() == "1224") ? first.GetType().GetProperty("Time") : null;
+                        var timeProp = hasTime ? first.GetType().GetProperty("Time") : null;
                         string time = timeProp?.GetValue(row)?.ToString() ?? "";
 
                         var line = new List<string> { draw.ToString(), date };
@@ -213,12 +233,10 @@ namespace LottoWebApp.Services
                     await writer.DisposeAsync();
                 }
 
-                // Добавляем последний файл в блоке колонок
                 createdFiles.Add(currentFilePath);
                 columnBlockIndex++;
             }
 
-            // Возвращаем архив со всеми файлами
             using var zipMemoryStream = new MemoryStream();
             using (var archive = new System.IO.Compression.ZipArchive(zipMemoryStream, System.IO.Compression.ZipArchiveMode.Create, true))
             {

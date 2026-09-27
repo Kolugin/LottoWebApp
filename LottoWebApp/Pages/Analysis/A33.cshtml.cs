@@ -42,6 +42,8 @@ namespace LottoWebApp.Pages.Analysis
         public int NumberOfBalls { get; set; }
         public bool CanIncludeBonus { get; set; }
         public int MaxCombinationSize { get; set; }
+        public bool HasTime { get; set; }
+        public bool Is320 { get; set; }
 
         public class GeneratedFileResult
         {
@@ -76,23 +78,27 @@ namespace LottoWebApp.Pages.Analysis
 
         private void SetGameParameters()
         {
-            (MaxBallNumber, NumberOfBalls, CanIncludeBonus) = Game?.ToLower() switch
+            Is320 = Game.Equals("320", StringComparison.OrdinalIgnoreCase);
+
+            (MaxBallNumber, NumberOfBalls, CanIncludeBonus, HasTime) = Game?.ToLower() switch
             {
-                "keno" => (60, 20, false),
-                "blitz" => (20, 8, true),
-                "5x36" => (36, 6, false),
-                "6x49" => (49, 6, false),
-                "1224" => (24, 12, false),
-                _ => (60, 20, false)
+                "keno" => (60, 20, false, false),
+                "blitz" => (20, 8, true, true),
+                "5x36" => (36, 6, false, false),
+                "6x49" => (49, 6, false, false),
+                "1224" => (24, 12, false, true),
+                "320" => (20, 6, false, true),
+                _ => (60, 20, false, false)
             };
 
             MaxCombinationSize = Game?.ToLower() switch
             {
                 "keno" => 10,
-                "blitz" => IncludeBonus ? 8 : 8,
+                "blitz" => 8,
                 "5x36" => 6,
                 "6x49" => 6,
                 "1224" => 12,
+                "320" => 6,
                 _ => Math.Min(MaxBallNumber, 12)
             };
 
@@ -137,7 +143,7 @@ namespace LottoWebApp.Pages.Analysis
                 .ToArray();
 
             List<string> combinations;
-            List<(int[] Main, int Bonus)> allParsedBonusCombos = new(); // для бонусных
+            List<(int[] Main, int Bonus)> allParsedBonusCombos = new();
 
             if (IncludeBonus)
             {
@@ -162,24 +168,47 @@ namespace LottoWebApp.Pages.Analysis
             }
 
             var matchedMap = new Dictionary<int, HashSet<int>>();
-
             var drawBallsMap = new Dictionary<int, HashSet<int>>();
             var bonusBallMap = new Dictionary<int, int>();
+
+            // Имена свойств для 320
+            var propNames320 = new[] { "B11", "B12", "B13", "B21", "B22", "B23" };
 
             foreach (var row in draws)
             {
                 int drawNumber = Convert.ToInt32(first.GetType().GetProperty("Draw")?.GetValue(row) ?? 0);
 
                 var drawBalls = new HashSet<int>();
-                for (int i = 1; i <= NumberOfBalls; i++)
+
+                if (Is320)
                 {
-                    var prop = numberProps.FirstOrDefault(p => p.Name == $"B{i}");
-                    if (prop != null)
+                    // Для 320 объединяем B1 и B2
+                    foreach (var propName in propNames320)
                     {
-                        var val = prop.GetValue(row);
-                        if (val != null && int.TryParse(val.ToString(), out int ball) && ball > 0)
+                        var prop = first.GetType().GetProperty(propName);
+                        if (prop != null)
                         {
-                            drawBalls.Add(ball);
+                            var val = prop.GetValue(row);
+                            if (val != null && int.TryParse(val.ToString(), out int ball) && ball > 0)
+                            {
+                                drawBalls.Add(ball);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    // Стандартная логика для остальных игр
+                    for (int i = 1; i <= NumberOfBalls; i++)
+                    {
+                        var prop = numberProps.FirstOrDefault(p => p.Name == $"B{i}");
+                        if (prop != null)
+                        {
+                            var val = prop.GetValue(row);
+                            if (val != null && int.TryParse(val.ToString(), out int ball) && ball > 0)
+                            {
+                                drawBalls.Add(ball);
+                            }
                         }
                     }
                 }
@@ -209,7 +238,6 @@ namespace LottoWebApp.Pages.Analysis
 
                 if (IncludeBonus && bonusBallMap.TryGetValue(drawNumber, out int bonusBall))
                 {
-                    // Проверяем все комбинации основных чисел с каждым возможным бонусом
                     for (int i = 0; i < allParsedBonusCombos.Count; i++)
                     {
                         var (mainNumbers, expectedBonus) = allParsedBonusCombos[i];
@@ -219,7 +247,6 @@ namespace LottoWebApp.Pages.Analysis
                 }
                 else
                 {
-                    // Только основные числа
                     for (int i = 0; i < parsedBaseCombinations.Length; i++)
                     {
                         if (parsedBaseCombinations[i].All(drawBalls.Contains))
@@ -239,7 +266,7 @@ namespace LottoWebApp.Pages.Analysis
             int maxColumnsPerFile = 15000;
 
             var baseHeaders = new List<string> { "Тираж", "Дата" };
-            if (Game?.ToLower() == "blitz" || Game?.ToLower() == "1224")
+            if (HasTime)
                 baseHeaders.Add("Время");
 
             int totalCombinations = combinations.Count;
@@ -271,7 +298,6 @@ namespace LottoWebApp.Pages.Analysis
                             await writer.FlushAsync();
                             await writer.DisposeAsync();
 
-                            // Добавляем файл в список перед созданием нового
                             string relativePath = currentFilePath.Replace(Directory.GetCurrentDirectory() + "\\wwwroot\\", "").Replace('\\', '/');
                             GeneratedFiles.Add(new GeneratedFileResult
                             {
@@ -292,7 +318,7 @@ namespace LottoWebApp.Pages.Analysis
                         var dateProp = first.GetType().GetProperty("Date");
                         string date = dateProp?.GetValue(row)?.ToString() ?? "";
 
-                        var timeProp = (Game?.ToLower() == "blitz" || Game?.ToLower() == "1224") ? first.GetType().GetProperty("Time") : null;
+                        var timeProp = HasTime ? first.GetType().GetProperty("Time") : null;
                         string time = timeProp?.GetValue(row)?.ToString() ?? "";
 
                         var line = new List<string> { draw.ToString(), date };
@@ -314,7 +340,6 @@ namespace LottoWebApp.Pages.Analysis
                     await writer.DisposeAsync();
                 }
 
-                // Добавляем последний файл в блоке колонок
                 string relativePathLast = currentFilePath.Replace(Directory.GetCurrentDirectory() + "\\wwwroot\\", "").Replace('\\', '/');
                 GeneratedFiles.Add(new GeneratedFileResult
                 {

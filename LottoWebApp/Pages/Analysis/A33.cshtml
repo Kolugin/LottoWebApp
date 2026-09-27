@@ -32,7 +32,7 @@
                     }
                 </select>
             </div>
-            @if (Model.Game?.ToLower() == "blitz")
+            @if (Model.CanIncludeBonus)
             {
                 <div class="col-md-3">
                     <label for="IncludeBonus" class="form-label">Включить бонус</label>
